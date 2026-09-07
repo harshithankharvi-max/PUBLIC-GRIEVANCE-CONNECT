@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 80px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-header h2 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .login-header p {
+            color: #999;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .admin-badge {
+            display: inline-block;
+            background: #fff3e0;
+            color: #f57c00;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .error-message {
+            background: #ffe0e0;
+            color: #d32f2f;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 124, 0, 0.4);
+        }
+        
+        .login-links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        
+        .login-links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 5px;
+        }
+        
+        .login-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            color: #ccc;
+        }
+        
+        .security-note {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="app-body">
+    <!-- Top Civic Government Header -->
+    <header class="civic-topbar admin-topbar-civic">
+        <div class="container civic-topbar-inner">
+            <div class="civic-flag">
+                <span class="flag-stripe orange"></span>
+                <span class="flag-stripe white"></span>
+                <span class="flag-stripe green"></span>
+                <span class="topbar-text">District Administration & Gram Panchayat Command Portal</span>
+            </div>
+            <div class="topbar-right">
+                <div class="lang-switcher-nav">
+                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
+                    <span class="lang-divider">|</span>
+                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="navbar navbar-admin">
+        <div class="container navbar-container">
+            <a href="{{ url_for('index') }}" class="brand-link">
+                <div class="brand-badge admin-badge-color">ADM</div>
+                <div class="brand-text">
+                    <span class="brand-title">GrievanceConnect</span>
+                    <span class="brand-subtitle">Administrator Portal</span>
+                </div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('login') }}">Citizen Login</a></li>
+                <li><a href="{{ url_for('complaints') }}">Public Issues</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="login-container">
+        <div class="login-header">
+            <div class="admin-badge">🔐 GRAM PANCHAYAT ADMIN</div>
+            <h2>Officer Authentication</h2>
+            <p>Authorized access for Taluk / Gram Panchayat officers</p>
+        </div>
+
+        {% if error %}
+            <div class="error-message">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('admin_login') }}">
+            <div class="form-group">
+                <label for="email">Admin Email Address</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    placeholder="admin@grievanceconnect.com" 
+                    value="{{ request.form.get('email', '') }}"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">Admin Password</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    placeholder="••••••••" 
+                    required
+                >
+            </div>
+
+            <button type="submit" class="btn-submit">Login as Administrator</button>
+        </form>
+
+        <div class="demo-credentials-box" style="margin-top: 20px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:12px; font-size:12px;">
+            <strong style="color:#0369a1;">📌 Demo Admin Credentials:</strong>
+            <div style="margin-top:4px; font-family:monospace; color:#0f172a;">
+                Email: <b>admin@grievanceconnect.com</b><br>
+                Password: <b>admin123</b>
+            </div>
+        </div>
+
+        <div class="security-note" style="margin-top: 15px;">
+            🛡️ Authorized government personnel only. All access actions are logged.
+        </div>
+
+        <div class="divider">or</div>
+
+        <div class="login-links">
+            <a href="{{ url_for('index') }}">← Back to Home</a>
+            <a href="{{ url_for('login') }}">Citizen Login →</a>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

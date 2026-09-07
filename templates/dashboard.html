@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - GrievanceConnect</title>
+    <title>Citizen Dashboard - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body class="app-body">
+    <!-- Top Civic Government Sub-Header -->
+    <header class="civic-topbar">
+        <div class="container civic-topbar-inner">
+            <div class="civic-flag">
+                <span class="flag-stripe orange"></span>
+                <span class="flag-stripe white"></span>
+                <span class="flag-stripe green"></span>
+                <span class="topbar-text">Citizen Grievance Redressal Portal • Gram Panchayat Services</span>
+            </div>
+            <div class="topbar-right">
+                <div class="lang-switcher-nav">
+                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
+                    <span class="lang-divider">|</span>
+                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand-block">
+                <div class="brand-icon">GC</div>
+                <div>
+                    <span class="eyebrow">AI civic platform</span>
+                    <span class="eyebrow">Rural Redressal</span>
+                    <strong>GrievanceConnect</strong>
+                </div>
+            </div>
+
+            <nav class="side-nav">
+                <a class="nav-item active" href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a class="nav-item" href="{{ url_for('new_complaint') }}">Submit Complaint</a>
+                <a class="nav-item" href="{{ url_for('complaints') }}">My Complaints</a>
+                <a class="nav-item" href="#analytics">Analytics</a>
+                <a class="nav-item" href="{{ url_for('voice_complaint') }}">Voice Reporting</a>
+                <a class="nav-item" href="{{ url_for('logout') }}">Logout</a>
+                <a class="nav-item active" href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+                <a class="nav-item" href="{{ url_for('new_complaint') }}">📝 Submit Complaint</a>
+                <a class="nav-item" href="{{ url_for('voice_complaint') }}">🎤 Voice Reporting</a>
+                <a class="nav-item" href="{{ url_for('complaints') }}">📋 My Complaints</a>
+                <a class="nav-item" href="{{ url_for('index') }}">🌐 Public Portal</a>
+                <a class="nav-item" href="{{ url_for('logout') }}">🚪 Logout</a>
+            </nav>
+
+            <!-- Citizen Profile Card in Sidebar -->
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                <div class="sidebar-user-card">
+                    <div class="sidebar-avatar">{{ session.get('user_name', 'C')[:1].upper() }}</div>
+                    <div>
+                        <div style="font-size:0.74rem; opacity:0.74; text-transform:uppercase; letter-spacing:0.08em;">Citizen</div>
+                        <strong>{{ session.get('user_name', 'Citizen') }}</strong>
+                    <div class="sidebar-user-meta">
+                        <span class="user-role-badge">Verified Citizen</span>
+                        <strong class="user-display-name">{{ session.get('user_name', 'Citizen') }}</strong>
+                        {% if user and user.get('phone') %}
+                            <small class="user-contact">📱 {{ user.get('phone') }}</small>
+                        {% elif user and user.get('email') %}
+                            <small class="user-contact">✉️ {{ user.get('email') }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <main class="main-panel">
+            <header class="topbar">
+                <div class="page-title">
+                    <h1>Dashboard</h1>
+                    <p>Public service overview and issue monitoring</p>
+                    <h1>Citizen Dashboard</h1>
+                    <p>Track your reported civic grievances and monitor Gram Panchayat redressal status</p>
+                </div>
+
+                <div class="topbar-actions">
+                    <div class="search-box">
+                        <span>⌕</span>
+                        <input type="text" placeholder="Search issues" aria-label="Search issues">
+                    </div>
+                    <div class="icon-btn" aria-label="Notifications">🔔</div>
+                    <div class="user-pill">
+                        <div class="avatar">{{ session.get('user_name', 'C')[:1].upper() }}</div>
+                        <div>
+                            <div style="font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">User</div>
+                            <strong>{{ session.get('user_name', 'Citizen') }}</strong>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('new_complaint') }}" class="btn btn-primary">
+                        ➕ Submit Complaint
+                    </a>
+                    <a href="{{ url_for('voice_complaint') }}" class="btn btn-accent">
+                        🎤 Voice Report
+                    </a>
+                </div>
+            </header>
+
+            <!-- Success Alert Banner if just submitted a complaint -->
+            {% if recent_submission %}
+            <div class="alert-banner alert-success" id="submissionAlert">
+                <div class="alert-icon">🎉</div>
+                <div class="alert-body">
+                    <strong>Complaint #{{ recent_submission.id }} Submitted Successfully!</strong>
+                    <p>Our AI system has classified your grievance into <strong>{{ recent_submission.category }}</strong> with Priority Score <strong>{{ recent_submission.priority }}/10</strong>. Gram Panchayat authorities have been notified.</p>
+                </div>
+                <button type="button" class="alert-close" onclick="document.getElementById('submissionAlert').style.display='none'">×</button>
+            </div>
+            {% endif %}
+
+            <!-- Quick Overview KPI Cards -->
+            <section class="stats-grid">
+                <div class="stat-card primary">
+                <div class="stat-card primary" onclick="filterComplaints('all', document.querySelector('.filter-btn[data-filter=\'all\']'))" style="cursor:pointer;">
+                    <div class="stat-icon-bg">📋</div>
+                    <p>Total Complaints</p>
+                    <div class="value">{{ complaints|length }}</div>
+                    <div class="trend">▲ Live feed</div>
+                    <div class="trend">All submitted by you</div>
+                </div>
+
+                <div class="stat-card warning">
+                    <p>Pending</p>
+                <div class="stat-card warning" onclick="filterComplaints('pending', document.querySelector('.filter-btn[data-filter=\'pending\']'))" style="cursor:pointer;">
+                    <div class="stat-icon-bg">⏳</div>
+                    <p>Pending Review</p>
+                    <div class="value">{{ complaints|selectattr('status', 'equalto', 'Pending')|list|length }}</div>
+                    <div class="trend">Needs review</div>
+                    <div class="trend">Awaiting assignment</div>
+                </div>
+
+                <div class="stat-card info">
+                <div class="stat-card info" onclick="filterComplaints('in-progress', document.querySelector('.filter-btn[data-filter=\'in-progress\']'))" style="cursor:pointer;">
+                    <div class="stat-icon-bg">⚙️</div>
+                    <p>In Progress</p>
+                    <div class="value">{{ complaints|selectattr('status', 'equalto', 'In Progress')|list|length }}</div>
+                    <div class="trend">Assigned</div>
+                    <div class="trend">Work in progress</div>
+                </div>
+
+                <div class="stat-card success">
+                <div class="stat-card success" onclick="filterComplaints('resolved', document.querySelector('.filter-btn[data-filter=\'resolved\']'))" style="cursor:pointer;">
+                    <div class="stat-icon-bg">✅</div>
+                    <p>Resolved</p>
+                    <div class="value">{{ complaints|selectattr('status', 'equalto', 'Resolved')|list|length }}</div>
+                    <div class="trend">Completed</div>
+                    <div class="trend">Completed & verified</div>
+                </div>
+            </section>
+
+                <div class="stat-card danger">
+                    <p>High Priority</p>
+                    <div class="value">{{ complaints|selectattr('priority', 'ge', 7)|list|length }}</div>
+                    <div class="trend">Urgent</div>
+            <!-- My Grievances List (Primary Focus for Citizens) -->
+            <section class="section-shell table-panel">
+                <div class="section-head">
+                    <div>
+                        <h3>My Complaints</h3>
+                        <p class="section-desc">Real-time status updates of your submitted civic grievances</p>
+                    </div>
+                    <div class="filter-row">
+                        <button class="filter-btn active" data-filter="all" onclick="filterComplaints('all', this)">All ({{ complaints|length }})</button>
+                        <button class="filter-btn" data-filter="pending" onclick="filterComplaints('pending', this)">Pending ({{ complaints|selectattr('status', 'equalto', 'Pending')|list|length }})</button>
+                        <button class="filter-btn" data-filter="in-progress" onclick="filterComplaints('in-progress', this)">In Progress ({{ complaints|selectattr('status', 'equalto', 'In Progress')|list|length }})</button>
+                        <button class="filter-btn" data-filter="resolved" onclick="filterComplaints('resolved', this)">Resolved ({{ complaints|selectattr('status', 'equalto', 'Resolved')|list|length }})</button>
+                        <button class="filter-btn" data-filter="voice" onclick="filterComplaints('voice', this)">🎤 Voice</button>
+                    </div>
+                </div>
+
+                {% if complaints %}
+                <div class="table-responsive">
+                    <table class="table modern-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Complaint Title</th>
+                                <th>AI Detected Category</th>
+                                <th>Location / Taluk</th>
+                                <th>Urgency</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for complaint in complaints %}
+                                {% set priority = complaint.get('priority', 0) | int %}
+                                {% set is_voice = complaint.get('is_voice_complaint', 0) | int %}
+                                {% set status = complaint.get('status', 'Pending') %}
+                                <tr class="complaint-row" 
+                                    data-status="{{ status }}" 
+                                    data-is-voice="{{ is_voice }}" 
+                                    data-priority="{{ priority }}">
+                                    <td class="col-id"><strong>#{{ complaint.get('id', '') }}</strong></td>
+                                    <td class="col-title">
+                                        <div class="complaint-title-text">{{ complaint.get('title', 'Untitled Complaint') }}</div>
+                                        {% if is_voice == 1 %}
+                                            <span class="badge-voice">🎤 Voice Recorded</span>
+                                        {% endif %}
+                                        {% if complaint.get('image_path') %}
+                                            <span class="badge-photo">📷 Photo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="category-tag">
+                                            {{ complaint.get('ai_category') or complaint.get('category') or 'Civic' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="location-text">
+                                            📍 {{ complaint.get('location', 'Rural Area') }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="priority-badge priority-{% if priority >= 7 %}high{% elif priority >= 4 %}medium{% else %}low{% endif %}">
+                                            {% if priority >= 7 %}🔴 High{% elif priority >= 4 %}🟡 Medium{% else %}🟢 Normal{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="status-pill status-{{ status.lower().replace(' ', '-') }}">
+                                            {% if status == 'Pending' %}⏳ Pending
+                                            {% elif status == 'In Progress' %}⚙️ In Progress
+                                            {% elif status == 'Resolved' %}✅ Resolved
+                                            {% else %}{{ status }}
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="table-actions">
+                                        <a href="{{ url_for('complaint_details', complaint_id=complaint.get('id')) }}" class="btn-action-view">
+                                            View Details →
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">📝</div>
+                    <h3>No complaints submitted yet</h3>
+                    <p>You have not registered any civic complaints. Click below to file your first grievance.</p>
+                    <div style="margin-top: 15px; display:flex; gap:10px; justify-content:center;">
+                        <a href="{{ url_for('new_complaint') }}" class="btn btn-primary">File Text Complaint</a>
+                        <a href="{{ url_for('voice_complaint') }}" class="btn btn-accent">Record Voice Complaint</a>
+                    </div>
+                </div>
+                {% endif %}
+            </section>
+
+            <!-- Analytics & Trends Section -->
+            <section class="section-shell" id="analytics">
+                <div class="section-head">
+                    <h3>Analytics Overview</h3>
+                    <div>
+                        <button id="clearFilters" class="filter-btn">Clear Filters</button>
+                        <span id="activeFilters"></span>
+                        <h3>My Grievance Analytics</h3>
+                        <p class="section-subtext">Category and status breakdown of your issues</p>
+                    </div>
+                    <button id="clearFilters" class="btn btn-sm btn-outline">Reset Chart Filters</button>
+                </div>
+
+                <div class="filter-row">
+                    <button class="filter-btn active" onclick="filterComplaints('all', this)">All</button>
+                    <button class="filter-btn" onclick="filterComplaints('pending', this)">Pending</button>
+                    <button class="filter-btn" onclick="filterComplaints('resolved', this)">Resolved</button>
+                    <button class="filter-btn" onclick="filterComplaints('voice', this)">🎤 Voice</button>
+                    <button class="filter-btn" onclick="filterComplaints('high', this)">🔴 High Priority</button>
+                </div>
+
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <h4>Complaints by Category</h4>
+                        <h4>Issues by Category</h4>
+                        <canvas id="categoryChart" aria-label="Category chart"></canvas>
+                    </div>
+
+                    <div class="chart-card">
+                        <h4>Complaints by Status</h4>
+                        <h4>Resolution Status</h4>
+                        <canvas id="statusChart" aria-label="Status chart"></canvas>
+                    </div>
+
+                    <div class="chart-card">
+                        <h4>Complaints Over Time</h4>
+                        <h4>Activity Timeline</h4>
+                        <canvas id="lineChart" aria-label="Time series chart"></canvas>
+                    </div>
+
+                    <div class="chart-card">
+                        <h4>Complaints by Priority</h4>
+                        <h4>Priority Distribution</h4>
+                        <canvas id="priorityChart" aria-label="Priority chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section-shell table-panel">
+                <div class="section-head">
+                    <h3>Recent Grievances</h3>
+                    <a href="{{ url_for('complaints') }}">View all</a>
+                </div>
+
+                {% if complaints %}
+                <table class="table modern-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for complaint in complaints %}
+                            {% set priority = complaint.get('priority', 0) | int %}
+                            {% set is_voice = complaint.get('is_voice_complaint', 0) | int %}
+                            <tr class="complaint-row" data-status="{{ complaint.get('status', 'Pending') }}" data-is-voice="{{ is_voice }}" data-priority="{{ priority }}">
+                                <td>#{{ complaint.get('id', '') }}</td>
+                                <td>
+                                    {{ complaint.get('title', 'Untitled Complaint') }}
+                                    {% if is_voice == 1 %}
+                                        <span class="voice-indicator">🎤 Voice</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ complaint.get('ai_category') or complaint.get('category') or 'N/A' }}</td>
+                                <td>{{ complaint.get('location', 'N/A') }}</td>
+                                <td>
+                                    <span class="priority-badge priority-{% if priority >= 7 %}high{% elif priority >= 4 %}medium{% else %}low{% endif %}">
+                                        {% if priority >= 7 %}🔴 High{% elif priority >= 4 %}🟡 Medium{% else %}🟢 Low{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% set status = complaint.get('status', 'Pending') %}
+                                    <span class="status {{ status.lower().replace(' ', '-') }}">{{ status }}</span>
+                                </td>
+                                <td class="table-actions">
+                                    <a href="{{ url_for('complaint_details', complaint_id=complaint.get('id')) }}">View</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                    <p style="padding: 18px 12px 0; color: var(--muted);">No complaints submitted yet. <a href="{{ url_for('voice_complaint') }}" style="color: var(--primary); font-weight:700;">Report one now!</a></p>
+                {% endif %}
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        function filterComplaints(filter, clickedButton) {
+            const rows = document.querySelectorAll('.complaint-row');
+            const buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(function(button) {
+                button.classList.remove('active');
+            });
+            clickedButton.classList.add('active');
+            if (clickedButton) clickedButton.classList.add('active');
+
+            rows.forEach(function(row) {
+                let show = false;
+                const rowStatus = (row.dataset.status || '').toLowerCase();
+                if (filter === 'all') show = true;
+                else if (filter === 'pending') show = row.dataset.status === 'Pending';
+                else if (filter === 'resolved') show = row.dataset.status === 'Resolved';
+                else if (filter === 'pending') show = rowStatus === 'pending';
+                else if (filter === 'in-progress') show = rowStatus === 'in progress';
+                else if (filter === 'resolved') show = rowStatus === 'resolved';
+                else if (filter === 'voice') show = row.dataset.isVoice === '1';
+                else if (filter === 'high') show = (parseInt(row.dataset.priority) || 0) >= 7;
+                row.style.display = show ? '' : 'none';
+            });
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        (function () {
+            const apiUrl = '/api/complaint-analytics';
+            let originalData = [];
+            let activeFilters = { category: null, status: null, priorityLevel: null, date: null };
+            let categoryChart, statusChart, lineChart, priorityChart;
+
+            function priorityLevelFromScore(p) {
+                if (p >= 7) return 'High';
+                if (p >= 4) return 'Medium';
+                return 'Low';
+            }
+
+            function toDateKey(iso) {
+                try {
+                    const d = new Date(iso);
+                    if (isNaN(d)) return null;
+                    return d.toISOString().slice(0, 10);
+                } catch (e) { return null; }
+            }
+
+            function aggregate(data) {
+                const byCategory = {};
+                const byStatus = {};
+                const byPriority = { High: 0, Medium: 0, Low: 0 };
+                const byDate = {};
+
+                data.forEach(d => {
+                    const cat = d.category || 'Uncategorized';
+                    const status = d.status || 'Pending';
+                    const pLevel = priorityLevelFromScore(d.priority || 0);
+                    const dateKey = toDateKey(d.created_at) || 'Unknown';
+
+                    byCategory[cat] = (byCategory[cat] || 0) + 1;
+                    byStatus[status] = (byStatus[status] || 0) + 1;
+                    byPriority[pLevel] = (byPriority[pLevel] || 0) + 1;
+                    byDate[dateKey] = (byDate[dateKey] || 0) + 1;
+                });
+
+                const sortedDates = Object.keys(byDate).filter(k => k !== 'Unknown').sort();
+                if (byDate['Unknown']) sortedDates.push('Unknown');
+
+                return { byCategory, byStatus, byPriority, byDate, sortedDates };
+            }
+
+            function buildChartData(agg) {
+                const categoryLabels = Object.keys(agg.byCategory).sort((a, b) => agg.byCategory[b] - agg.byCategory[a]);
+                const categoryValues = categoryLabels.map(l => agg.byCategory[l]);
+                const statusLabels = ['Pending', 'In Progress', 'Resolved', 'Rejected'];
+                const statusValues = statusLabels.map(l => agg.byStatus[l] || 0);
+                const priorityLabels = ['High', 'Medium', 'Low'];
+                const priorityValues = priorityLabels.map(l => agg.byPriority[l] || 0);
+                const dateLabels = agg.sortedDates;
+                const dateValues = dateLabels.map(d => agg.byDate[d] || 0);
+
+                return { categoryLabels, categoryValues, statusLabels, statusValues, priorityLabels, priorityValues, dateLabels, dateValues };
+            }
+
+            function updateActiveFiltersUI() {
+                const parts = [];
+                if (activeFilters.category) parts.push('Category: ' + activeFilters.category);
+                if (activeFilters.status) parts.push('Status: ' + activeFilters.status);
+                if (activeFilters.priorityLevel) parts.push('Priority: ' + activeFilters.priorityLevel);
+                if (activeFilters.date) parts.push('Date: ' + activeFilters.date);
+                document.getElementById('activeFilters').textContent = parts.join(' | ');
+            }
+
+            function renderCharts(data) {
+                const agg = aggregate(data);
+                const cds = buildChartData(agg);
+
+                const ctxCat = document.getElementById('categoryChart').getContext('2d');
+                if (categoryChart) categoryChart.destroy();
+                categoryChart = new Chart(ctxCat, {
+                    type: 'bar',
+                    data: { labels: cds.categoryLabels, datasets: [{ label: 'Complaints', data: cds.categoryValues, backgroundColor: ['#1e5eff', '#4f8cff', '#90b6ff', '#dbeafe', '#7dd3fc', '#a7f3d0'] }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { enabled: true } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, onClick: (evt) => chartClickHandler(evt, categoryChart, 'category') }
+                });
+
+                const ctxStatus = document.getElementById('statusChart').getContext('2d');
+                if (statusChart) statusChart.destroy();
+                statusChart = new Chart(ctxStatus, {
+                    type: 'doughnut',
+                    data: { labels: cds.statusLabels, datasets: [{ data: cds.statusValues, backgroundColor: ['#f39c12', '#1e5eff', '#1cb67a', '#dfe7ef'] }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { enabled: true } }, onClick: (evt) => chartClickHandler(evt, statusChart, 'status') }
+                });
+
+                const ctxLine = document.getElementById('lineChart').getContext('2d');
+                if (lineChart) lineChart.destroy();
+                lineChart = new Chart(ctxLine, {
+                    type: 'line',
+                    data: { labels: cds.dateLabels, datasets: [{ label: 'Complaints', data: cds.dateValues, borderColor: '#1e5eff', backgroundColor: 'rgba(30,94,255,0.10)', fill: true, tension: 0.3 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { enabled: true } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, onClick: (evt) => chartClickHandler(evt, lineChart, 'date') }
+                });
+
+                const ctxPri = document.getElementById('priorityChart').getContext('2d');
+                if (priorityChart) priorityChart.destroy();
+                priorityChart = new Chart(ctxPri, {
+                    type: 'bar',
+                    data: { labels: cds.priorityLabels, datasets: [{ label: 'Complaints', data: cds.priorityValues, backgroundColor: ['#e74c3c', '#f39c12', '#1cb67a'] }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { enabled: true } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, onClick: (evt) => chartClickHandler(evt, priorityChart, 'priorityLevel') }
+                });
+
+                updateActiveFiltersUI();
+            }
+
+            function chartClickHandler(evt, chart, type) {
+                const points = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+                if (!points.length) return;
+                const first = points[0];
+                const label = chart.data.labels[first.index];
+
+                if (type === 'category') activeFilters.category = activeFilters.category === label ? null : label;
+                else if (type === 'status') activeFilters.status = activeFilters.status === label ? null : label;
+                else if (type === 'priorityLevel') activeFilters.priorityLevel = activeFilters.priorityLevel === label ? null : label;
+                else if (type === 'date') activeFilters.date = activeFilters.date === label ? null : label;
+
+                applyFiltersAndRender();
+            }
+
+            function applyFiltersAndRender() {
+                let filtered = originalData.slice();
+                if (activeFilters.category) filtered = filtered.filter(d => d.category === activeFilters.category);
+                if (activeFilters.status) filtered = filtered.filter(d => d.status === activeFilters.status);
+                if (activeFilters.priorityLevel) filtered = filtered.filter(d => priorityLevelFromScore(d.priority) === activeFilters.priorityLevel);
+                if (activeFilters.date) filtered = filtered.filter(d => toDateKey(d.created_at) === activeFilters.date);
+                renderCharts(filtered);
+            }
+
+            document.getElementById('clearFilters').addEventListener('click', function () {
+                activeFilters = { category: null, status: null, priorityLevel: null, date: null };
+                applyFiltersAndRender();
+            });
+
+            fetch(apiUrl).then(r => r.json()).then(js => {
+                if (!js.success) {
+                    console.error('Analytics API error', js.error || js);
+                    return;
+                }
+
+                originalData = js.complaints || [];
+                originalData = originalData.map(c => ({
+                    id: c.id,
+                    title: c.title,
+                    category: c.category,
+                    status: c.status,
+                    priority: c.priority || 0,
+                    created_at: c.created_at
+                }));
+
+                renderCharts(originalData);
+            }).catch(err => console.error('Failed to load analytics data', err));
+        })();
+    </script>
+</body>
+</html>

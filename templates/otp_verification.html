@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify OTP - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .verify-container {
+            max-width: 400px;
+            margin: 80px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .verify-container h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .verify-container p {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        
+        .phone-display {
+            text-align: center;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .error-message {
+            background: #ffe0e0;
+            color: #d32f2f;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .otp-inputs {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .otp-input {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            transition: border-color 0.3s;
+        }
+        
+        .otp-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .otp-text-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 18px;
+            text-align: center;
+            letter-spacing: 5px;
+            box-sizing: border-box;
+        }
+        
+        .otp-text-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-resend {
+            width: 100%;
+            padding: 10px;
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 15px;
+        }
+        
+        .btn-resend:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+        
+        .btn-resend:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .resend-info {
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            margin-top: 10px;
+        }
+        
+        .timer {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .link-back {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .link-back a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .link-back a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="brand">GrievanceConnect</div>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="verify-container">
+        <h2>✓ Verify OTP</h2>
+        <p>Enter the 6-digit OTP sent to your phone</p>
+
+        <div class="phone-display">
+            📱 {{ session.get('phone_for_otp', 'your phone') }}
+        </div>
+
+        {% if error %}
+            <div class="error-message">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('verify_otp') }}" id="otpForm">
+            <div class="form-group">
+                <label for="otp">OTP Code</label>
+                <input 
+                    type="text" 
+                    id="otp" 
+                    name="otp" 
+                    class="otp-text-input"
+                    placeholder="000000" 
+                    required
+                    maxlength="6"
+                    pattern="[0-9]{6}"
+                    inputmode="numeric"
+                    autocomplete="off"
+                >
+            </div>
+
+            <button type="submit" class="btn-submit">Verify OTP</button>
+        </form>
+
+        <!-- Resend OTP -->
+        <form method="POST" action="{{ url_for('resend_otp') }}" id="resendForm">
+            <button type="submit" class="btn-resend" id="resendBtn">Resend OTP</button>
+            <div class="resend-info" id="resendInfo"></div>
+        </form>
+
+        <div class="link-back">
+            <a href="{{ url_for('phone_login') }}">← Use different number</a>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    </div>
+
+    <script>
+        // Auto-focus next input (if using individual OTP boxes in future)
+        // This is placeholder for enhanced UX
+        
+        // Resend OTP with cooldown
+        const resendBtn = document.getElementById('resendBtn');
+        const resendForm = document.getElementById('resendForm');
+        const resendInfo = document.getElementById('resendInfo');
+        
+        let cooldownSeconds = 0;
+        
+        function updateResendBtn() {
+            if (cooldownSeconds > 0) {
+                resendBtn.disabled = true;
+                resendInfo.innerHTML = `You can resend OTP in <span class="timer">${cooldownSeconds}s</span>`;
+                cooldownSeconds--;
+                setTimeout(updateResendBtn, 1000);
+            } else {
+                resendBtn.disabled = false;
+                resendInfo.innerHTML = '';
+            }
+        }
+        
+        // Check if cooldown cookie exists
+        const cooldown = getCookie('otp_cooldown');
+        if (cooldown) {
+            cooldownSeconds = parseInt(cooldown);
+            updateResendBtn();
+        }
+        
+        resendForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            fetch('{{ url_for("resend_otp") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    cooldownSeconds = 60;
+                    updateResendBtn();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            });
+        });
+        
+        function getCookie(name) {
+            const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+            return match ? match[2] : null;
+        }
+    </script>
+</body>
+</html>

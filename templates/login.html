@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Login - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="app-body">
+    <!-- Top Civic Government Header -->
+    <header class="civic-topbar">
+        <div class="container civic-topbar-inner">
+            <div class="civic-flag">
+                <span class="flag-stripe orange"></span>
+                <span class="flag-stripe white"></span>
+                <span class="flag-stripe green"></span>
+                <span class="topbar-text">Citizen Redressal Portal • Secure Authentication</span>
+            </div>
+            <div class="topbar-right">
+                <div class="lang-switcher-nav">
+                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
+                    <span class="lang-divider">|</span>
+                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <a href="{{ url_for('index') }}" class="brand-link">
+                <div class="brand-badge">GC</div>
+                <div class="brand-text">
+                    <span class="brand-title">GrievanceConnect</span>
+                    <span class="brand-subtitle">Rural Redressal</span>
+                </div>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('phone_login') }}">Phone OTP Login</a></li>
+                <li><a href="{{ url_for('register') }}">Register</a></li>
+                <li><a href="{{ url_for('admin_login') }}" class="nav-btn-admin">Admin Portal</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 480px; margin: 48px auto;">
+        <div class="auth-card-shell">
+            <div class="auth-header">
+                <div class="auth-icon-badge">👤</div>
+                <h2>Citizen Login</h2>
+                <p>Sign in to file grievances, track resolution status, and receive Gram Panchayat updates.</p>
+            </div>
+
+            {% if error %}
+            <div class="alert-banner alert-danger">
+                <strong>Authentication Failed:</strong> {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('login') }}">
+                <div class="form-group-civic">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" class="form-input-civic" placeholder="citizen@example.com" value="{{ request.form.get('email', '') }}" required autofocus>
+                </div>
+
+                <div class="form-group-civic">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-input-civic" placeholder="••••••••" required>
+                </div>
+
+                <div class="form-actions-civic" style="margin-top: 24px;">
+                    <button class="btn btn-primary btn-block btn-lg" type="submit">Sign In to Dashboard</button>
+                </div>
+            </form>
+
+            <div class="auth-divider">
+                <span>OR SIGN IN WITH PHONE</span>
+            </div>
+
+            <a href="{{ url_for('phone_login') }}" class="btn btn-secondary btn-block">
+                📱 Sign In via Mobile OTP
+            </a>
+
+            <div class="demo-credentials-box">
+                <small class="demo-label">📌 Demonstration Credentials:</small>
+                <div class="demo-cred-row">
+                    <span>Citizen: <code>dhruthi099@gmail.com</code> / <code>12345</code></span>
+                </div>
+                <div class="demo-cred-row" style="margin-top: 4px;">
+                    <span>Admin: <a href="{{ url_for('admin_login') }}" style="color:var(--primary); font-weight:600;">Open Admin Portal</a></span>
+                </div>
+            </div>
+
+            <div class="auth-footer-links">
+                <span>Don't have an account? <a href="{{ url_for('register') }}">Create an Account</a></span>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

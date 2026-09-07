@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice-Based Complaint - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .voice-container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            color: white;
+        }
+        
+        .voice-container h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .voice-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .voice-section label {
+            display: block;
+            margin-bottom: 12px;
+            font-weight: 500;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .recording-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .voice-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .voice-btn-primary {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .voice-btn-primary:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+        
+        .voice-btn-secondary {
+            background: #4ecdc4;
+            color: white;
+        }
+        
+        .voice-btn-secondary:hover {
+            background: #45b8af;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(78, 205, 196, 0.4);
+        }
+        
+        .voice-btn-success {
+            background: #51cf66;
+            color: white;
+        }
+        
+        .voice-btn-success:hover {
+            background: #40c057;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(81, 207, 102, 0.4);
+        }
+        
+        .voice-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .recording-status {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .recording-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .transcription-result {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border-left: 4px solid #51cf66;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .location-info {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        
+        .location-info strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .ai-classification {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border-left: 4px solid #ffd43b;
+        }
+        
+        .ai-classification strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #ffd43b;
+        }
+        
+        .priority-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+            margin-top: 8px;
+        }
+        
+        .priority-high { background: #ff6b6b; }
+        .priority-medium { background: #ffa94d; }
+        .priority-low { background: #51cf66; }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: #51cf66;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 20px;
+        }
+        
+        .submit-btn:hover {
+            background: #40c057;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(81, 207, 102, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            background: #ff6b6b;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border-left: 4px solid #ff5252;
+        }
+        
+        .success-message {
+            background: #51cf66;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border-left: 4px solid #40c057;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .tab-btn {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn.active {
+            color: white;
+            border-bottom-color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="app-body">
+    <!-- Top Civic Government Header -->
+    <header class="civic-topbar">
+        <div class="container civic-topbar-inner">
+            <div class="civic-flag">
+                <span class="flag-stripe orange"></span>
+                <span class="flag-stripe white"></span>
+                <span class="flag-stripe green"></span>
+                <span class="topbar-text">Public Grievance Voice Reporting • Rural Multilingual Support</span>
+            </div>
+            <div class="topbar-right">
+                <div class="lang-switcher-nav">
+                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
+                    <span class="lang-divider">|</span>
+                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <a href="{{ url_for('index') }}" class="brand-link">
+                <div class="brand-badge">GC</div>
+                <div class="brand-text">
+                    <span class="brand-title">GrievanceConnect</span>
+                    <span class="brand-subtitle">Voice Grievance</span>
+                </div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('new_complaint') }}">Text Complaint</a></li>
+                <li><a href="{{ url_for('complaints') }}">My Complaints</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="voice-container">
+        <h2>🎤 Voice-Based Complaint</h2>
+        
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('voice')">🎙️ Voice Report</button>
+            <button class="tab-btn" onclick="switchTab('text')">✍️ Text Report</button>
+        </div>
+        
+        <!-- Voice-Based Form -->
+        <div id="voice-tab" class="tab-content active">
+            <form id="voiceComplaintForm" method="POST" enctype="multipart/form-data">
+                <!-- Recording Controls -->
+                <div class="voice-section">
+                    <label>Step 1: Record Your Complaint</label>
+                    <div class="recording-controls">
+                        <button type="button" class="voice-btn voice-btn-primary" id="startBtn" onclick="startRecording()">
+                            🎙️ Start Recording
+                        </button>
+                        <button type="button" class="voice-btn voice-btn-secondary" id="stopBtn" onclick="stopRecording()" disabled>
+                            ⏹️ Stop Recording
+                        </button>
+                    </div>
+                    <div class="recording-status" id="recordingStatus" style="display: none;">
+                        <span class="recording-indicator"></span>
+                        <span id="recordingTime">Recording: 00:00</span>
+                    </div>
+                </div>
+                
+                <!-- Transcription Result -->
+                <div class="voice-section" id="transcriptionSection" style="display: none;">
+                    <label>Step 2: Review Transcription</label>
+                    <div class="transcription-result">
+                        <p id="transcriptionText"></p>
+                    </div>
+                    <textarea name="description" id="descriptionText" placeholder="Edit or confirm the transcribed text..." required></textarea>
+                </div>
+                
+                <!-- Location -->
+                <div class="voice-section">
+                    <label>Step 3: Location</label>
+                    <button type="button" class="voice-btn voice-btn-secondary" onclick="getLocation()">
+                        📍 Get Current Location
+                    </button>
+                    <div class="location-info" id="locationInfo" style="display: none;">
+                        <strong>Location:</strong>
+                        <span id="locationText"></span>
+                        <input type="hidden" name="latitude" id="latitude">
+                        <input type="hidden" name="longitude" id="longitude">
+                    </div>
+                    <input type="text" name="location" id="manualLocation" placeholder="Or enter location manually" required>
+                </div>
+                
+                <!-- Category -->
+                <div class="voice-section">
+                    <label for="category">Category (Optional)</label>
+                    <select name="category" id="category">
+                        <option value="">Let AI auto-detect</option>
+                        <option value="Infrastructure">Infrastructure</option>
+                        <option value="Water & Sanitation">Water & Sanitation</option>
+                        <option value="Electricity">Electricity</option>
+                        <option value="Public Health">Public Health</option>
+                        <option value="Noise Pollution">Noise Pollution</option>
+                        <option value="Air Quality">Air Quality</option>
+                        <option value="Public Safety">Public Safety</option>
+                        <option value="Traffic">Traffic</option>
+                        <option value="Cleanliness">Cleanliness</option>
+                    </select>
+                </div>
+                
+                <!-- AI Classification Result -->
+                <div class="ai-classification" id="aiResult" style="display: none;">
+                    <strong>🤖 AI Classification:</strong>
+                    <div>
+                        <strong>Category:</strong> <span id="aiCategory"></span>
+                    </div>
+                    <div>
+                        <strong>Priority:</strong> <span id="aiPriority"></span>
+                    </div>
+                    <div>
+                        <strong>Confidence:</strong> <span id="aiConfidence"></span>
+                    </div>
+                </div>
+                
+                <input type="hidden" name="is_voice_complaint" value="1">
+                <input type="hidden" name="voice_note" id="voiceNoteInput">
+                
+                <button type="submit" class="submit-btn" id="submitBtn">Submit Voice Complaint</button>
+            </form>
+        </div>
+        
+        <!-- Text-Based Form (Alternative) -->
+        <div id="text-tab" class="tab-content">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="voice-section">
+                    <label for="title">Complaint Title</label>
+                    <input type="text" name="title" id="title" placeholder="Brief title of your complaint" required>
+                </div>
+                
+                <div class="voice-section">
+                    <label for="description">Description</label>
+                    <textarea name="description" placeholder="Detailed description of your complaint" required></textarea>
+                </div>
+                
+                <div class="voice-section">
+                    <label for="location">Location</label>
+                    <input type="text" name="location" placeholder="Where did this issue occur?" required>
+                    <button type="button" class="voice-btn voice-btn-secondary" onclick="getLocation()" style="width: 100%; margin-top: 10px;">
+                        📍 Get Current Location
+                    </button>
+                </div>
+                
+                <div class="voice-section">
+                    <label for="category">Category</label>
+                    <select name="category" id="textCategory">
+                        <option value="">Select category</option>
+                        <option value="Infrastructure">Infrastructure</option>
+                        <option value="Water & Sanitation">Water & Sanitation</option>
+                        <option value="Electricity">Electricity</option>
+                        <option value="Public Health">Public Health</option>
+                        <option value="Noise Pollution">Noise Pollution</option>
+                        <option value="Air Quality">Air Quality</option>
+                        <option value="Public Safety">Public Safety</option>
+                        <option value="Traffic">Traffic</option>
+                        <option value="Cleanliness">Cleanliness</option>
+                    </select>
+                </div>
+                
+                <input type="hidden" name="is_voice_complaint" value="0">
+                <button type="submit" class="submit-btn">Submit Text Complaint</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let latestAudioBlob = null;
+        let recordingStartTime;
+        let recordingTimer;
+        
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const rawBlob = new Blob(audioChunks); // actual recorded blob (may be webm/ogg)
+                    try {
+                        const wavBlob = await convertToWav(rawBlob);
+                        latestAudioBlob = wavBlob;
+                        await transcribeAudio(wavBlob);
+                    } catch (err) {
+                        // Fallback: try sending raw blob if conversion fails
+                        latestAudioBlob = rawBlob;
+                        await transcribeAudio(rawBlob);
+                    } finally {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                };
+                
+                mediaRecorder.start();
+                recordingStartTime = Date.now();
+                updateRecordingTime();
+                
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('recordingStatus').style.display = 'block';
+                
+            } catch (error) {
+                alert('Error accessing microphone: ' + error.message);
+            }
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                clearInterval(recordingTimer);
+                document.getElementById('recordingStatus').style.display = 'none';
+            }
+        }
+        
+        function updateRecordingTime() {
+            recordingTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('recordingTime').textContent = 
+                    `Recording: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }, 1000);
+        }
+        
+        async function transcribeAudio(audioBlob) {
+            try {
+                const formData = new FormData();
+                formData.append('voice_file', audioBlob, 'recording.wav');
+                
+                const response = await fetch('/api/transcribe-voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('transcriptionText').textContent = result.text;
+                    document.getElementById('descriptionText').value = result.text;
+                    document.getElementById('transcriptionSection').style.display = 'block';
+                    
+                    // Classify the transcribed text
+                    await classifyComplaint(result.text);
+                } else {
+                    alert('Transcription failed: ' + result.error_message);
+                }
+            } catch (error) {
+                alert('Error transcribing audio: ' + error.message);
+            }
+        }
+
+        // Convert arbitrary audio blob (webm/ogg) to PCM WAV using WebAudio API
+        async function convertToWav(blob) {
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+            const numChannels = audioBuffer.numberOfChannels;
+            const sampleRate = audioBuffer.sampleRate;
+            const pcmBuffer = encodeWAV(audioBuffer, numChannels, sampleRate);
+
+            return new Blob([pcmBuffer], { type: 'audio/wav' });
+        }
+
+        // Encode AudioBuffer to a WAV ArrayBuffer (16-bit PCM)
+        function encodeWAV(audioBuffer, numChannels, sampleRate) {
+            const length = audioBuffer.length * numChannels * 2 + 44;
+            const buffer = new ArrayBuffer(length);
+            const view = new DataView(buffer);
+
+            /* RIFF identifier */
+            writeString(view, 0, 'RIFF');
+            /* file length */
+            view.setUint32(4, 36 + audioBuffer.length * numChannels * 2, true);
+            /* RIFF type */
+            writeString(view, 8, 'WAVE');
+            /* format chunk identifier */
+            writeString(view, 12, 'fmt ');
+            /* format chunk length */
+            view.setUint32(16, 16, true);
+            /* sample format (raw) */
+            view.setUint16(20, 1, true);
+            /* channel count */
+            view.setUint16(22, numChannels, true);
+            /* sample rate */
+            view.setUint32(24, sampleRate, true);
+            /* byte rate (sample rate * block align) */
+            view.setUint32(28, sampleRate * numChannels * 2, true);
+            /* block align (channel count * bytes per sample) */
+            view.setUint16(32, numChannels * 2, true);
+            /* bits per sample */
+            view.setUint16(34, 16, true);
+            /* data chunk identifier */
+            writeString(view, 36, 'data');
+            /* data chunk length */
+            view.setUint32(40, audioBuffer.length * numChannels * 2, true);
+
+            // Interleave channels and write PCM samples
+            let offset = 44;
+            const channels = [];
+            for (let i = 0; i < numChannels; i++) {
+                channels.push(audioBuffer.getChannelData(i));
+            }
+
+            for (let i = 0; i < audioBuffer.length; i++) {
+                for (let ch = 0; ch < numChannels; ch++) {
+                    let sample = channels[ch][i] || 0;
+                    // clamp
+                    sample = Math.max(-1, Math.min(1, sample));
+                    // convert to 16-bit PCM
+                    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                    offset += 2;
+                }
+            }
+
+            return buffer;
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+        
+        async function classifyComplaint(text) {
+            try {
+                const location = document.getElementById('manualLocation').value;
+                const response = await fetch('/api/classify-complaint', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: text.substring(0, 50),
+                        description: text,
+                        location: location
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('aiCategory').textContent = result.category;
+                    document.getElementById('aiPriority').textContent = getPriorityLabel(result.priority);
+                    document.getElementById('aiConfidence').textContent = (result.confidence * 100).toFixed(1) + '%';
+                    document.getElementById('aiResult').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Classification error:', error);
+            }
+        }
+        
+        function getPriorityLabel(priority) {
+            if (priority >= 7) return '🔴 High';
+            if (priority >= 4) return '🟡 Medium';
+            return '🟢 Low';
+        }
+        
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        document.getElementById('latitude').value = lat;
+                        document.getElementById('longitude').value = lng;
+                        document.getElementById('locationText').textContent = 
+                            `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
+                        document.getElementById('locationInfo').style.display = 'block';
+                        
+                        // Also try to get location name
+                        getLocationName(lat, lng);
+                    },
+                    (error) => {
+                        alert('Error getting location: ' + error.message);
+                    }
+                );
+            } else {
+                alert('Geolocation is not supported by this browser');
+            }
+        }
+        
+        async function getLocationName(lat, lng) {
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+                );
+                const data = await response.json();
+                const locationName = data.address?.city || data.address?.town || data.address?.county || 'Unknown';
+                document.getElementById('manualLocation').value = locationName;
+            } catch (error) {
+                console.error('Error getting location name:', error);
+            }
+        }
+        
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.getElementById('voice-tab').classList.remove('active');
+            document.getElementById('text-tab').classList.remove('active');
+            
+            // Deactivate all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab
+            if (tabName === 'voice') {
+                document.getElementById('voice-tab').classList.add('active');
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            } else {
+                document.getElementById('text-tab').classList.add('active');
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            }
+        }
+
+        // Intercept form submit to attach recorded audio and send to API
+        document.getElementById('voiceComplaintForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const description = (document.getElementById('descriptionText').value || '').trim();
+            const location = (document.getElementById('manualLocation').value || '').trim();
+            const latitude = document.getElementById('latitude').value || '';
+            const longitude = document.getElementById('longitude').value || '';
+            const category = document.getElementById('category').value || '';
+
+            if (!description) {
+                alert('Please record your voice complaint or enter the transcribed text before submitting.');
+                return;
+            }
+
+            if (!location) {
+                alert('Please add a location before submitting the complaint.');
+                return;
+            }
+
+            const fd = new FormData();
+            if (latestAudioBlob) {
+                fd.append('voice_file', latestAudioBlob, 'recording.wav');
+            }
+            fd.append('description', description);
+            fd.append('location', location);
+            fd.append('latitude', latitude);
+            fd.append('longitude', longitude);
+            fd.append('category', category);
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            try {
+                const resp = await fetch('/api/process-voice-complaint', {
+                    method: 'POST',
+                    body: fd
+                });
+
+                const json = await resp.json();
+                if (json.success) {
+                    window.location.href = '/dashboard';
+                } else {
+                    alert('Submission failed: ' + (json.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Error submitting voice complaint: ' + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Voice Complaint';
+            }
+        });
+    </script>
+</body>
+</html>

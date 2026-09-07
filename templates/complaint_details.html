@@ -1,0 +1,728 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Complaint Details - GrievanceConnect</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <style>
+        .details-container {
+            max-width: 900px;
+            margin: 30px auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .details-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+        }
+
+        .details-header h2 {
+            margin: 0 0 15px 0;
+            font-size: 28px;
+        }
+
+        .details-meta-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-badge,
+        .priority-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
+
+        .priority-badge {
+            margin-left: 8px;
+        }
+
+        .priority-high {
+            background: #ffe0e0;
+            color: #d32f2f;
+        }
+
+        .priority-medium {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .priority-low {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .details-body {
+            padding: 30px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-card strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-card span {
+            font-size: 15px;
+            color: #666;
+        }
+
+        .map-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .map-container.active {
+            display: block;
+        }
+
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .ai-classification {
+            background: linear-gradient(135deg, #ffd43b 0%, #fdab46 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .ai-classification strong {
+            display: block;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .ai-items {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .ai-item {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .ai-item-label {
+            font-size: 12px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .ai-item-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .voice-section {
+            background: #e8f4f8;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #4ecdc4;
+            display: none;
+        }
+
+        .voice-section.active {
+            display: block;
+        }
+
+        .voice-section strong {
+            display: block;
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .audio-player {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        audio {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .description-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .description-section h4 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .description-section p {
+            line-height: 1.6;
+            color: #666;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+        }
+
+        .action-buttons a,
+        .action-buttons button {
+            padding: 12px 25px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .btn-back {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-back:hover {
+            background: #e0e0e0;
+        }
+
+        /* Responsive design */
+        @media (max-width: 600px) {
+            .details-container {
+                margin: 15px;
+            }
+
+            .details-header,
+            .details-body {
+                padding: 20px;
+            }
+
+            .details-header h2 {
+                font-size: 22px;
+            }
+
+            .details-meta-row {
+                gap: 10px;
+            }
+
+            #map {
+                height: 300px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .action-buttons a,
+            .action-buttons button {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="container">
+
+            <div class="brand">
+                GrievanceConnect
+            </div>
+
+            <ul class="nav-links">
+                <li>
+                    <a href="{{ url_for('index') }}">Home</a>
+                </li>
+
+                <li>
+                    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                </li>
+
+                <li>
+                    <a href="{{ url_for('complaints') }}">All Complaints</a>
+                </li>
+            </ul>
+
+        </div>
+    </nav>
+
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <div class="details-container">
+
+            <!-- Complaint Header -->
+            <div class="details-header">
+
+                <h2>
+                    {{ complaint.title }}
+                </h2>
+
+                <div class="details-meta-row">
+
+                    <!-- Status -->
+                    <div class="meta-item">
+
+                        <span class="status-badge">
+                            {{ complaint.status }}
+                        </span>
+
+                    </div>
+
+
+                    <!-- Priority -->
+                    <div class="meta-item">
+
+                        <span class="priority-badge
+                            priority-{% if complaint.priority >= 7 %}
+                            high
+                            {% elif complaint.priority >= 4 %}
+                            medium
+                            {% else %}
+                            low
+                            {% endif %}">
+
+                            {% if complaint.priority >= 7 %}
+                                🔴 HIGH PRIORITY
+                            {% elif complaint.priority >= 4 %}
+                                🟡 MEDIUM PRIORITY
+                            {% else %}
+                                🟢 LOW PRIORITY
+                            {% endif %}
+
+                        </span>
+
+                    </div>
+
+
+                    <!-- Voice Complaint -->
+                    {% if complaint.is_voice_complaint == 1 %}
+
+                    <div class="meta-item">
+
+                        <span style="
+                            background: rgba(255, 255, 255, 0.3);
+                            padding: 6px 14px;
+                            border-radius: 20px;
+                            font-size: 12px;
+                        ">
+                            🎤 Voice Report
+                        </span>
+
+                    </div>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+
+            <!-- Complaint Body -->
+            <div class="details-body">
+
+
+                <!-- AI Classification -->
+                {% if complaint.ai_category %}
+
+                <div class="ai-classification">
+
+                    <strong>
+                        🤖 AI Classification & Analysis
+                    </strong>
+
+                    <div class="ai-items">
+
+                        <div class="ai-item">
+
+                            <div class="ai-item-label">
+                                Category
+                            </div>
+
+                            <div class="ai-item-value">
+                                {{ complaint.ai_category }}
+                            </div>
+
+                        </div>
+
+
+                        <div class="ai-item">
+
+                            <div class="ai-item-label">
+                                Priority Score
+                            </div>
+
+                            <div class="ai-item-value">
+                                {{ complaint.priority }}/10
+                            </div>
+
+                        </div>
+
+
+                        <div class="ai-item">
+
+                            <div class="ai-item-label">
+                                Type
+                            </div>
+
+                            <div class="ai-item-value">
+
+                                {% if complaint.is_voice_complaint == 1 %}
+                                    Voice Based
+                                {% else %}
+                                    Text Based
+                                {% endif %}
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                <!-- Geolocation Map: use coords if available, otherwise geocode `complaint.location` -->
+                {% if complaint.image_path %}
+                <div class="description-section" style="margin-top: 20px;">
+                    <h4>📷 Uploaded Image</h4>
+                    <img src="{{ url_for('static', filename=complaint.image_path) }}" alt="Complaint image" style="max-width:100%; border-radius:8px; max-height:420px; object-fit:cover;">
+                </div>
+                {% endif %}
+
+                {% if complaint.location %}
+
+                <div
+                    class="map-container"
+                    id="map-container"
+                    data-location="{{ complaint.location }}"
+                    {% if complaint.latitude and complaint.longitude %}
+                    data-latitude="{{ complaint.latitude }}"
+                    data-longitude="{{ complaint.longitude }}"
+                    {% endif %}
+                >
+
+                    <div id="map"></div>
+
+                    <div style="
+                        font-size: 12px;
+                        color: #666;
+                        text-align: center;
+                    ">
+
+                        📍 Location:
+                        {{ complaint.location }}
+
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                <!-- Information Grid -->
+                <div class="info-grid">
+
+
+                    <!-- Complaint ID -->
+                    <div class="info-card">
+
+                        <strong>
+                            Complaint ID
+                        </strong>
+
+                        <span>
+                            #{{ complaint.id }}
+                        </span>
+
+                    </div>
+
+
+                    <!-- Category -->
+                    <div class="info-card">
+
+                        <strong>
+                            Category
+                        </strong>
+
+                        <span>
+                            {{ complaint.category }}
+                        </span>
+
+                    </div>
+
+
+                    <!-- Location -->
+                    <div class="info-card">
+
+                        <strong>
+                            Location
+                        </strong>
+
+                        <span>
+                            {{ complaint.location }}
+                        </span>
+
+                    </div>
+
+
+                    <!-- Submitted By -->
+                    <div class="info-card">
+
+                        <strong>
+                            Submitted By
+                        </strong>
+
+                        <span>
+                            {{ complaint.submitted_by }}
+                        </span>
+
+                    </div>
+
+
+                    <!-- Date -->
+                    <div class="info-card">
+
+                        <strong>
+                            Date Submitted
+                        </strong>
+
+                        <span>
+                            {{ complaint.date }}
+                        </span>
+
+                    </div>
+
+
+                    <!-- Status -->
+                    <div class="info-card">
+
+                        <strong>
+                            Status
+                        </strong>
+
+                        <span>
+                            {{ complaint.status }}
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Voice Note -->
+                {% if complaint.voice_note_path %}
+
+                <div class="voice-section active">
+
+                    <strong>
+                        🎙️ Voice Note
+                    </strong>
+
+                    <div class="audio-player">
+
+                        <audio controls>
+
+                            <source
+                                src="{{ url_for(
+                                    'static',
+                                    filename='voice_notes/' +
+                                    complaint.voice_note_path.split('/')[-1]
+                                ) }}"
+                                type="audio/wav"
+                            >
+
+                            Your browser does not support the audio element.
+
+                        </audio>
+
+                        <p style="
+                            font-size: 12px;
+                            color: #999;
+                            margin: 5px 0 0 0;
+                        ">
+                            Original voice recording for this complaint
+                        </p>
+
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                <!-- Description -->
+                <div class="description-section">
+
+                    <h4>
+                        📝 Description
+                    </h4>
+
+                    <p>
+                        {{ complaint.description }}
+                    </p>
+
+                </div>
+
+
+                <!-- Action Buttons -->
+                <div class="action-buttons" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    {% if session.get('role') == 'admin' %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="btn-back">
+                            ← Back to Admin Dashboard
+                        </a>
+                        <form method="POST" action="{{ url_for('update_complaint_status', complaint_id=complaint.id) }}" style="display:inline-flex; align-items:center; gap:8px;">
+                            <label style="font-weight:600; font-size:13px;">Update Status:</label>
+                            <select name="status" class="status-select-civic" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; font-weight:600;">
+                                <option value="Pending" {% if complaint.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                <option value="In Progress" {% if complaint.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                <option value="Resolved" {% if complaint.status == 'Resolved' %}selected{% endif %}>Resolved</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary" style="padding:8px 16px; border-radius:6px;">Save Status</button>
+                        </form>
+                    {% else %}
+                        <a href="{{ url_for('dashboard') }}" class="btn-back">
+                            ← Back to Dashboard
+                        </a>
+                    {% endif %}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Map JavaScript -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const mapContainer = document.getElementById("map-container");
+            if (!mapContainer) {
+                return;
+            }
+
+            const locationName = mapContainer.dataset.location || "Complaint Location";
+            let latitude = mapContainer.dataset.latitude ? parseFloat(mapContainer.dataset.latitude) : null;
+            let longitude = mapContainer.dataset.longitude ? parseFloat(mapContainer.dataset.longitude) : null;
+
+            async function initMap(lat, lon, label) {
+                const map = L.map("map").setView([lat, lon], 13);
+
+                L.tileLayer(
+                    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    {
+                        attribution: "&copy; OpenStreetMap contributors",
+                        maxZoom: 19
+                    }
+                ).addTo(map);
+
+                L.marker([lat, lon]).addTo(map).bindPopup(label).openPopup();
+
+                setTimeout(function () { map.invalidateSize(); }, 200);
+            }
+
+            (async function () {
+                try {
+                    if (latitude != null && longitude != null && !Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+                        initMap(latitude, longitude, locationName);
+                        document.getElementById('map-container').classList.add('active');
+                        return;
+                    }
+
+                    // Fallback: geocode location name using Nominatim
+                    const q = encodeURIComponent(locationName);
+                    const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`;
+                    const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+                    const results = await resp.json();
+
+                    if (results && results.length > 0) {
+                        const r = results[0];
+                        const lat = parseFloat(r.lat);
+                        const lon = parseFloat(r.lon);
+                        initMap(lat, lon, locationName);
+                        document.getElementById('map-container').classList.add('active');
+                        return;
+                    }
+
+                    mapContainer.style.display = 'none';
+                } catch (err) {
+                    console.error('Map init error:', err);
+                    mapContainer.style.display = 'none';
+                }
+            })();
+        });
+    </script>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

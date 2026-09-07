@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Login - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 80px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .login-container h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .login-container p {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        
+        .error-message {
+            background: #ffe0e0;
+            color: #d32f2f;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .success-message {
+            background: #e8f5e9;
+            color: #388e3c;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+        
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .login-links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        
+        .login-links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 5px;
+        }
+        
+        .login-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body class="app-body">
+    <!-- Top Civic Government Header -->
+    <header class="civic-topbar">
+        <div class="container civic-topbar-inner">
+            <div class="civic-flag">
+                <span class="flag-stripe orange"></span>
+                <span class="flag-stripe white"></span>
+                <span class="flag-stripe green"></span>
+                <span class="topbar-text">Citizen Redressal Portal • Mobile OTP Verification</span>
+            </div>
+            <div class="topbar-right">
+                <div class="lang-switcher-nav">
+                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
+                    <span class="lang-divider">|</span>
+                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <a href="{{ url_for('index') }}" class="brand-link">
+                <div class="brand-badge">GC</div>
+                <div class="brand-text">
+                    <span class="brand-title">GrievanceConnect</span>
+                    <span class="brand-subtitle">OTP Authentication</span>
+                </div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('login') }}">Email Login</a></li>
+                <li><a href="{{ url_for('admin_login') }}" class="nav-btn-admin">Admin Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="login-container">
+        <h2>🔐 Citizen Login</h2>
+        <p>Enter your mobile number to receive an OTP</p>
+
+        {% if error %}
+            <div class="error-message">{{ error }}</div>
+        {% endif %}
+
+        {% if success %}
+            <div class="success-message">{{ success }}</div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('phone_login') }}">
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input 
+                    type="tel" 
+                    id="phone" 
+                    name="phone" 
+                    placeholder="+919876543210" 
+                    required
+                    pattern="^\+?[1-9]\d{1,14}$"
+                >
+                <div class="help-text">Include country code (e.g., +91 for India)</div>
+            </div>
+
+            <button type="submit" class="btn-submit">Send OTP</button>
+        </form>
+
+        <div class="divider">or</div>
+
+        <div class="login-links">
+            <a href="{{ url_for('index') }}">← Back to Home</a>
+            <a href="{{ url_for('login') }}">Sign In with Email →</a>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Command Center - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body class="app-body">
+    <!-- Top Civic Government Header -->
+    <header class="civic-topbar admin-topbar-civic">
+        <div class="container civic-topbar-inner">
+            <div class="civic-flag">
+                <span class="flag-stripe orange"></span>
+                <span class="flag-stripe white"></span>
+                <span class="flag-stripe green"></span>
+                <span class="topbar-text">District Administration & Gram Panchayat Redressal Command Portal</span>
+            </div>
+            <div class="topbar-right">
+                <span class="admin-auth-badge">🔐 Administrator Mode</span>
+                <div class="lang-switcher-nav" style="margin-left: 10px;">
+                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
+                    <span class="lang-divider">|</span>
+                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Navigation Bar -->
+    <nav class="navbar navbar-admin">
+        <div class="container navbar-container">
+            <a href="{{ url_for('admin_dashboard') }}" class="brand-link">
+                <div class="brand-badge admin-badge-color">ADM</div>
+                <div class="brand-text">
+                    <span class="brand-title">GrievanceConnect Admin</span>
+                    <span class="brand-subtitle">Rural Redressal Authority Portal</span>
+                </div>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="{{ url_for('admin_dashboard') }}" class="nav-active">Dashboard</a></li>
+                <li><a href="#geospatial-map">Geospatial Map</a></li>
+                <li><a href="#complaints-table">Manage Complaints</a></li>
+                <li><a href="{{ url_for('index') }}" target="_blank">View Public Site ↗</a></li>
+                <li><a href="{{ url_for('logout') }}" class="nav-btn-outline">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container" style="margin-top: 24px; margin-bottom: 60px;">
+        <!-- Page Title & Header -->
+        <div class="page-title-banner">
+            <div>
+                <h2>Administrative Redressal Dashboard</h2>
+                <p>Monitor rural grievances across Gram Panchayats, analyze AI auto-categorized issues, and update resolution workflows.</p>
+            </div>
+            <div class="admin-quick-actions">
+                <a href="#geospatial-map" class="btn btn-secondary btn-sm">🗺️ View Map</a>
+                <a href="#complaints-table" class="btn btn-primary btn-sm">📋 All Issues ({{ stats.total }})</a>
+            </div>
+        </div>
+
+        <!-- 1. KPI Statistics Overview -->
+        <section class="stats-grid" style="margin-bottom: 28px;">
+            <div class="stat-card primary">
+                <div class="stat-icon-bg">📊</div>
+                <p>Total Complaints</p>
+                <div class="value">{{ stats.total }}</div>
+                <div class="trend">All rural submissions</div>
+            </div>
+
+            <div class="stat-card warning">
+                <div class="stat-icon-bg">⏳</div>
+                <p>Pending Redressal</p>
+                <div class="value">{{ stats.pending }}</div>
+                <div class="trend">Requires review</div>
+            </div>
+
+            <div class="stat-card info">
+                <div class="stat-icon-bg">⚙️</div>
+                <p>In Progress</p>
+                <div class="value">{{ stats.in_progress }}</div>
+                <div class="trend">Assigned to team</div>
+            </div>
+
+            <div class="stat-card success">
+                <div class="stat-icon-bg">✅</div>
+                <p>Resolved</p>
+                <div class="value">{{ stats.resolved }}</div>
+                <div class="trend">Fully addressed</div>
+            </div>
+
+            <div class="stat-card danger">
+                <div class="stat-icon-bg">🚨</div>
+                <p>High Priority</p>
+                <div class="value">{{ stats.high_priority }}</div>
+                <div class="trend">Urgent attention</div>
+            </div>
+        </section>
+
+        <!-- 2. Interactive Geospatial GIS Map -->
+        <section class="section-shell" id="geospatial-map" style="margin-bottom: 28px;">
+            <div class="section-head">
+                <div>
+                    <h3>📍 Geospatial Grievance GIS Map</h3>
+                    <p class="section-subtext">Interactive geographic distribution of rural complaints tagged with GPS coordinates</p>
+                </div>
+                <div class="map-legend">
+                    <span class="legend-item"><span class="legend-dot dot-pending"></span> Pending</span>
+                    <span class="legend-item"><span class="legend-dot dot-progress"></span> In Progress</span>
+                    <span class="legend-item"><span class="legend-dot dot-resolved"></span> Resolved</span>
+                    <span class="legend-item"><span class="legend-dot dot-critical"></span> High Urgency</span>
+                </div>
+            </div>
+
+            <div id="adminGisMap" style="width: 100%; height: 420px; border-radius: 12px; border: 1px solid #dbe2ea; z-index: 1;"></div>
+            <small class="help-hint" style="margin-top: 8px; display: block;">💡 Click on any map marker to view citizen grievance title, AI category, rural location, and direct link to details.</small>
+        </section>
+
+        <!-- 3. AI Category Breakdown Cards -->
+        <section class="section-shell" style="margin-bottom: 28px;">
+            <div class="section-head">
+                <div>
+                    <h3>🤖 AI Complaint Categories</h3>
+                    <p class="section-subtext">Automatic categorization distribution processed by machine learning</p>
+                </div>
+            </div>
+
+            <div class="category-badges-grid">
+                {% for category, count in categories.items() %}
+                <div class="cat-stat-card">
+                    <div class="cat-stat-name">
+                        {% if 'electric' in category.lower() or 'light' in category.lower() %}⚡
+                        {% elif 'water' in category.lower() or 'sanit' in category.lower() %}💧
+                        {% elif 'infrastruct' in category.lower() or 'road' in category.lower() %}🏗️
+                        {% elif 'health' in category.lower() %}🏥
+                        {% elif 'safety' in category.lower() %}🚨
+                        {% elif 'clean' in category.lower() %}🧹
+                        {% elif 'traffic' in category.lower() %}🚗
+                        {% else %}📌
+                        {% endif %}
+                        {{ category }}
+                    </div>
+                    <div class="cat-stat-count">{{ count }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- 4. Manage Complaints Table & Status Updater -->
+        <section class="section-shell table-panel" id="complaints-table">
+            <div class="section-head">
+                <div>
+                    <h3>All Registered Complaints</h3>
+                    <p class="section-desc">Review grievances, verify AI categorization, and update operational status</p>
+                </div>
+
+                <div class="filter-row">
+                    <button type="button" class="filter-btn active" onclick="filterAdminTable('all', this)">All ({{ complaints|length }})</button>
+                    <button type="button" class="filter-btn" onclick="filterAdminTable('Pending', this)">Pending ({{ stats.pending }})</button>
+                    <button type="button" class="filter-btn" onclick="filterAdminTable('In Progress', this)">In Progress ({{ stats.in_progress }})</button>
+                    <button type="button" class="filter-btn" onclick="filterAdminTable('Resolved', this)">Resolved ({{ stats.resolved }})</button>
+                    <button type="button" class="filter-btn" onclick="filterAdminTable('high', this)">🔴 High Priority</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table modern-table" id="adminTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Submitted By</th>
+                            <th>Grievance Summary</th>
+                            <th>AI Category</th>
+                            <th>Location / GIS</th>
+                            <th>Priority</th>
+                            <th>Current Status</th>
+                            <th>Update Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in complaints %}
+                            {% set priority = c.get('priority', 0) | int %}
+                            {% set is_voice = c.get('is_voice_complaint', 0) | int %}
+                            {% set status = c.get('status', 'Pending') %}
+                            <tr class="admin-complaint-row"
+                                data-status="{{ status }}"
+                                data-priority="{{ priority }}"
+                                id="row-complaint-{{ c.id }}">
+                                <td><strong>#{{ c.id }}</strong></td>
+                                <td>
+                                    <div class="citizen-name">{{ c.submitted_by or 'Citizen' }}</div>
+                                    <small class="citizen-phone">📱 {{ c.phone or 'N/A' }}</small>
+                                </td>
+                                <td>
+                                    <div class="complaint-title-text">{{ c.title }}</div>
+                                    {% if is_voice == 1 %}
+                                        <span class="badge-voice">🎤 Voice Note</span>
+                                    {% endif %}
+                                    {% if c.image_path %}
+                                        <span class="badge-photo">📷 Photo</span>
+                                    {% endif %}
+                                    <small class="text-muted" style="display:block; font-size:11px;">{{ c.created_at[:10] if c.created_at else '' }}</small>
+                                </td>
+                                <td>
+                                    <span class="category-tag">
+                                        {{ c.ai_category or c.category or 'Other' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div>📍 {{ c.location or 'Rural Area' }}</div>
+                                    {% if c.latitude and c.longitude %}
+                                        <small class="loc-coords-tag">GIS: {{ c.latitude|round(3) }}, {{ c.longitude|round(3) }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="priority-badge priority-{% if priority >= 7 %}high{% elif priority >= 4 %}medium{% else %}low{% endif %}">
+                                        {% if priority >= 7 %}🔴 High ({{ priority }})
+                                        {% elif priority >= 4 %}🟡 Medium ({{ priority }})
+                                        {% else %}🟢 Low ({{ priority }})
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-pill status-{{ status.lower().replace(' ', '-') }}" id="status-pill-{{ c.id }}">
+                                        {{ status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('update_complaint_status', complaint_id=c.id) }}" class="status-update-form" onsubmit="handleStatusSubmit(event, {{ c.id }})">
+                                        <select name="status" class="status-select-civic" id="select-status-{{ c.id }}">
+                                            <option value="Pending" {% if status == 'Pending' %}selected{% endif %}>Pending</option>
+                                            <option value="In Progress" {% if status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                            <option value="Resolved" {% if status == 'Resolved' %}selected{% endif %}>Resolved</option>
+                                        </select>
+                                        <button type="submit" class="btn-update-status" title="Save status">✓</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('complaint_details', complaint_id=c.id) }}" class="btn-action-view">
+                                        Details →
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Data for Geospatial Leaflet Map
+        const complaintMarkers = [
+            {% for c in complaints %}
+                {% if c.latitude and c.longitude %}
+                    {
+                        id: {{ c.id }},
+                        title: {{ (c.title or 'Complaint')|tojson }},
+                        category: {{ (c.ai_category or c.category or 'Grievance')|tojson }},
+                        location: {{ (c.location or 'Rural Area')|tojson }},
+                        status: {{ (c.status or 'Pending')|tojson }},
+                        priority: {{ (c.priority or 0)|int }},
+                        lat: parseFloat({{ c.latitude }}),
+                        lon: parseFloat({{ c.longitude }})
+                    },
+                {% endif %}
+            {% endfor %}
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initAdminMap();
+        });
+
+        function initAdminMap() {
+            // Default center around Karnataka rural areas (e.g. Bantwal / Mangalore / Bangalore coords)
+            let defaultLat = 12.9716;
+            let defaultLon = 77.5946;
+
+            if (complaintMarkers.length > 0) {
+                defaultLat = complaintMarkers[0].lat;
+                defaultLon = complaintMarkers[0].lon;
+            }
+
+            const map = L.map('adminGisMap').setView([defaultLat, defaultLon], 9);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors • Geospatial Grievance System',
+                maxZoom: 18
+            }).addTo(map);
+
+            const bounds = [];
+
+            complaintMarkers.forEach(item => {
+                if (isNaN(item.lat) || isNaN(item.lon)) return;
+
+                bounds.push([item.lat, item.lon]);
+
+                let color = '#f39c12'; // Pending = Amber
+                if (item.status === 'In Progress') color = '#1e5eff';
+                if (item.status === 'Resolved') color = '#1cb67a';
+                if (item.priority >= 7) color = '#e74c3c';
+
+                const markerIcon = L.divIcon({
+                    className: 'custom-gis-pin',
+                    html: `<div style="background-color:${color}; width:24px; height:24px; border-radius:50%; border:3px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold;">${item.id}</div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+
+                const marker = L.marker([item.lat, item.lon], { icon: markerIcon }).addTo(map);
+
+                const popupHtml = `
+                    <div style="font-family:sans-serif; min-width:200px; padding:4px;">
+                        <strong style="color:#112033; font-size:14px;">#${item.id}: ${item.title}</strong>
+                        <div style="margin:4px 0; font-size:12px; color:#555;">📍 ${item.location}</div>
+                        <div style="margin:4px 0; font-size:12px;"><strong>AI Category:</strong> ${item.category}</div>
+                        <div style="margin:4px 0; font-size:12px;"><strong>Status:</strong> <span style="font-weight:bold; color:${color};">${item.status}</span></div>
+                        <div style="margin-top:8px;">
+                            <a href="/complaint/${item.id}" style="color:#1e5eff; font-size:12px; font-weight:bold; text-decoration:none;">Inspect Details →</a>
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupHtml);
+            });
+
+            if (bounds.length > 1) {
+                map.fitBounds(bounds, { padding: [30, 30] });
+            }
+        }
+
+        // Table Filtering
+        function filterAdminTable(statusFilter, btn) {
+            const buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            const rows = document.querySelectorAll('.admin-complaint-row');
+            rows.forEach(row => {
+                const status = row.dataset.status;
+                const priority = parseInt(row.dataset.priority) || 0;
+
+                let show = false;
+                if (statusFilter === 'all') show = true;
+                else if (statusFilter === 'high') show = priority >= 7;
+                else show = (status === statusFilter);
+
+                row.style.display = show ? '' : 'none';
+            });
+        }
+
+        // AJAX Status Update for Smooth Demonstration
+        async function handleStatusSubmit(event, complaintId) {
+            event.preventDefault();
+            const form = event.target;
+            const select = form.querySelector('select');
+            const newStatus = select.value;
+            const btn = form.querySelector('button');
+
+            btn.disabled = true;
+            btn.textContent = '...';
+
+            try {
+                const resp = await fetch(`/admin/complaint/${complaintId}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                const data = await resp.json();
+                if (data.success) {
+                    // Update pill in row
+                    const pill = document.getElementById(`status-pill-${complaintId}`);
+                    if (pill) {
+                        pill.textContent = newStatus;
+                        pill.className = `status-pill status-${newStatus.toLowerCase().replace(' ', '-')}`;
+                    }
+
+                    // Update row data attribute
+                    const row = document.getElementById(`row-complaint-${complaintId}`);
+                    if (row) {
+                        row.dataset.status = newStatus;
+                    }
+
+                    btn.textContent = '✓';
+                    btn.style.backgroundColor = '#1cb67a';
+                    btn.style.color = '#fff';
+                    setTimeout(() => {
+                        btn.style.backgroundColor = '';
+                        btn.style.color = '';
+                        btn.disabled = false;
+                    }, 1200);
+                } else {
+                    alert('Could not update status: ' + (data.error || 'Server error'));
+                    btn.textContent = '✓';
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                console.error('Status update error:', err);
+                form.submit(); // fallback to standard POST
+            }
+        }
+    </script>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
