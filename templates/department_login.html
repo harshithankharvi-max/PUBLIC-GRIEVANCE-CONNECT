@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ dept_info.title }} Authority Login - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="civic-portal">
+    <!-- Top Civic Header -->
+    <header class="civic-topbar admin-bar">
+        <div class="container topbar-flex">
+            <div class="gov-seal">
+                <span class="emblem-text">🏛️ Karnataka Panchayat Raj & Rural Development | Department Redressal Cell</span>
+            </div>
+            <div class="topbar-actions">
+                <div class="lang-switch-container">
+                    <span class="lang-label">🌐 Language / ಭಾಷೆ:</span>
+                    <button type="button" class="lang-pill active" onclick="window.setLanguage('en')">English</button>
+                    <span class="lang-sep">|</span>
+                    <button type="button" class="lang-pill" onclick="window.setLanguage('kn')">ಕನ್ನಡ</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="navbar admin-nav">
+        <div class="container nav-content">
+            <a href="{{ url_for('index') }}" class="brand-link">
+                <div class="brand-icon">{{ dept_info.icon }}</div>
+                <div class="brand-text-block">
+                    <span class="brand-title">GrievanceConnect</span>
+                    <span class="brand-sub">{{ dept_info.title }}</span>
+                </div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}" class="nav-item">Home</a></li>
+                <li><a href="{{ url_for('admin_login') }}" class="nav-item">Master Admin Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        <div class="login-container" style="max-width: 480px; margin: 40px auto;">
+            <!-- Department Header Badge -->
+            <div class="text-center" style="margin-bottom: 24px;">
+                <div class="dept-header-icon-large bg-{{ department|lower }}" style="margin: 0 auto 16px auto; width: 68px; height: 68px; font-size: 34px;">
+                    {{ dept_info.icon }}
+                </div>
+                <span class="admin-badge" style="background: #e0e7ff; color: #3730a3; margin-bottom: 8px;">Authorized Personnel Only</span>
+                <h1 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 4px 0;">{{ dept_info.title }}</h1>
+                <h2 style="font-size: 15px; font-weight: 600; color: #64748b; margin: 0 0 8px 0;">{{ dept_info.kannada_title }}</h2>
+                <p style="font-size: 13px; color: #64748b; margin: 0;">{{ dept_info.badge }}</p>
+            </div>
+
+            {% if error %}
+            <div class="civic-alert alert-danger" style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                <span>⚠️</span>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Login Form -->
+            <form method="POST" action="{{ url_for('admin_department_login', dept_name=department|lower) }}">
+                <div class="form-group">
+                    <label class="civic-label required" for="email">Department Authority Email</label>
+                    <input type="email" id="email" name="email" class="civic-input" placeholder="officer@karnataka.gov.in" required autocomplete="username">
+                </div>
+
+                <div class="form-group">
+                    <label class="civic-label required" for="password">Authority Password</label>
+                    <input type="password" id="password" name="password" class="civic-input" placeholder="Enter authority password" required autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="btn-primary-action btn-{{ department|lower }}" style="margin-top: 8px;">
+                    Login to {{ dept_info.title }} →
+                </button>
+            </form>
+
+            <div class="text-center" style="margin-top: 20px;">
+                <a href="{{ url_for('index') }}" class="btn-cancel-link">← Return to GrievanceConnect Home</a>
+            </div>
+        </div>
+    </main>
+
+    <footer class="civic-footer" style="margin-top: 60px;">
+        <div class="container footer-bottom">
+            <span>© 2026 GrievanceConnect — AI-enabled Geospatial Rural Public Redressal System</span>
+            <span>Department Access Node: {{ department }}</span>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

@@ -120,39 +120,13 @@
         }
     </style>
 </head>
-<body class="app-body">
-    <!-- Top Civic Government Header -->
-    <header class="civic-topbar">
-        <div class="container civic-topbar-inner">
-            <div class="civic-flag">
-                <span class="flag-stripe orange"></span>
-                <span class="flag-stripe white"></span>
-                <span class="flag-stripe green"></span>
-                <span class="topbar-text">Citizen Redressal Portal • Mobile OTP Verification</span>
-            </div>
-            <div class="topbar-right">
-                <div class="lang-switcher-nav">
-                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
-                    <span class="lang-divider">|</span>
-                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
-                </div>
-            </div>
-        </div>
-    </header>
-
+<body>
     <nav class="navbar">
-        <div class="container navbar-container">
-            <a href="{{ url_for('index') }}" class="brand-link">
-                <div class="brand-badge">GC</div>
-                <div class="brand-text">
-                    <span class="brand-title">GrievanceConnect</span>
-                    <span class="brand-subtitle">OTP Authentication</span>
-                </div>
-            </a>
+        <div class="container">
+            <div class="brand">GrievanceConnect</div>
             <ul class="nav-links">
                 <li><a href="{{ url_for('index') }}">Home</a></li>
-                <li><a href="{{ url_for('login') }}">Email Login</a></li>
-                <li><a href="{{ url_for('admin_login') }}" class="nav-btn-admin">Admin Login</a></li>
+                <li><a href="{{ url_for('admin_login') }}">Admin Login</a></li>
             </ul>
         </div>
     </nav>
@@ -190,7 +164,7 @@
 
         <div class="login-links">
             <a href="{{ url_for('index') }}">← Back to Home</a>
-            <a href="{{ url_for('login') }}">Sign In with Email →</a>
+            <a href="{{ url_for('admin_login') }}">Admin Login →</a>
         </div>
     </div>
 

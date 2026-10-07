@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ dept_info.title }} - GrievanceConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="civic-portal admin-portal-body">
+    <!-- Top Civic Header -->
+    <header class="civic-topbar admin-bar">
+        <div class="container topbar-flex">
+            <div class="gov-seal">
+                <span class="emblem-text">🏛️ Karnataka Panchayat Raj & Rural Development | Department Redressal Cell</span>
+            </div>
+            <div class="topbar-actions">
+                <div class="lang-switch-container">
+                    <span class="lang-label">🌐 Language / ಭಾಷೆ:</span>
+                    <button type="button" class="lang-pill active" onclick="window.setLanguage('en')">English</button>
+                    <span class="lang-sep">|</span>
+                    <button type="button" class="lang-pill" onclick="window.setLanguage('kn')">ಕನ್ನಡ</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="navbar admin-nav">
+        <div class="container nav-content">
+            <a href="{{ url_for('admin_dashboard') }}" class="brand-link">
+                <div class="brand-icon">{{ dept_info.icon }}</div>
+                <div class="brand-text-block">
+                    <span class="brand-title">GrievanceConnect</span>
+                    <span class="brand-sub">{{ dept_info.title }}</span>
+                </div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('admin_dashboard') }}" class="nav-item">← Master Overview</a></li>
+                <li><a href="{{ url_for('admin_department_portal', dept_name='electricity') }}" class="nav-item {% if department == 'ELECTRICITY' %}active{% endif %}">⚡ Electricity</a></li>
+                <li><a href="{{ url_for('admin_department_portal', dept_name='pwd') }}" class="nav-item {% if department == 'PWD' %}active{% endif %}">🏗️ PWD</a></li>
+                <li><a href="{{ url_for('admin_department_portal', dept_name='water') }}" class="nav-item {% if department == 'WATER' %}active{% endif %}">💧 Water</a></li>
+                <li><a href="{{ url_for('logout') }}" class="nav-btn-outline">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        <!-- Department Banner Header -->
+        <div class="admin-header-card dept-banner-card card-{{ department|lower }}">
+            <div class="dept-header-content">
+                <div class="dept-header-icon-large bg-{{ department|lower }}">{{ dept_info.icon }}</div>
+                <div>
+                    <div class="dept-badge-row">
+                        <span class="admin-badge dept-header-badge">{{ department }} AUTHORITY</span>
+                        <span class="dept-role-pill">Officer Resolution Cell</span>
+                    </div>
+                    <h1 class="admin-title">{{ dept_info.title }}</h1>
+                    <h2 class="dept-kn-subtitle">{{ dept_info.kannada_title }}</h2>
+                    <p class="admin-subtitle">{{ dept_info.desc }}</p>
+
+                    <!-- Covered Categories Tags -->
+                    <div class="dept-cat-tags" style="margin-top: 14px;">
+                        <span style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 6px; align-self: center;">Assigned Categories:</span>
+                        {% for cat in dept_info.categories %}
+                        <span class="dept-tag">✓ {{ cat }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="dept-header-actions">
+                <a href="{{ url_for('admin_dashboard') }}" class="btn-back-master">
+                    ← Back to Master Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Department KPI Metrics -->
+        <section class="admin-kpi-row">
+            <div class="admin-kpi-card">
+                <span class="kpi-icon">{{ dept_info.icon }}</span>
+                <div>
+                    <span class="kpi-label">Department Complaints</span>
+                    <h3 class="kpi-val">{{ stats.total }}</h3>
+                </div>
+            </div>
+
+            <div class="admin-kpi-card kpi-pending">
+                <span class="kpi-icon">⏳</span>
+                <div>
+                    <span class="kpi-label">Pending Action</span>
+                    <h3 class="kpi-val">{{ stats.pending }}</h3>
+                </div>
+            </div>
+
+            <div class="admin-kpi-card kpi-warning">
+                <span class="kpi-icon">⚙️</span>
+                <div>
+                    <span class="kpi-label">In Progress</span>
+                    <h3 class="kpi-val">{{ stats.in_progress }}</h3>
+                </div>
+            </div>
+
+            <div class="admin-kpi-card kpi-resolved">
+                <span class="kpi-icon">✅</span>
+                <div>
+                    <span class="kpi-label">Resolved</span>
+                    <h3 class="kpi-val">{{ stats.resolved }}</h3>
+                </div>
+            </div>
+
+            <div class="admin-kpi-card kpi-danger">
+                <span class="kpi-icon">🔴</span>
+                <div>
+                    <span class="kpi-label">High Priority Hazards</span>
+                    <h3 class="kpi-val">{{ stats.high_priority }}</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Department GIS Map Section -->
+        <section class="gis-map-wrapper">
+            <div class="gis-header-bar">
+                <div class="gis-title-block">
+                    <span class="gis-pulse"></span>
+                    <div>
+                        <h3 class="gis-title">{{ department }} Department Spatial GIS Map</h3>
+                        <p class="gis-sub">Geospatial incidents filtered specifically for {{ dept_info.title }}</p>
+                    </div>
+                </div>
+                <div class="gis-legend">
+                    <span class="legend-item"><span class="dot dot-high"></span> High Priority</span>
+                    <span class="legend-item"><span class="dot dot-med"></span> Medium</span>
+                    <span class="legend-item"><span class="dot dot-resolved"></span> Resolved</span>
+                </div>
+            </div>
+            <div id="deptGisMap" class="gis-map-canvas"></div>
+        </section>
+
+        <!-- Department Complaints Table -->
+        <section class="civic-table-container mt-4">
+            <div class="table-header-bar">
+                <div>
+                    <h2 class="table-title">{{ dept_info.title }} Grievances Registry</h2>
+                    <p class="table-subtitle">Assigned civic issues requiring {{ department }} engineering or maintenance action.</p>
+                </div>
+                <div class="table-filter-pills">
+                    <button type="button" class="filter-pill active" onclick="filterDeptTable('all', this)">All ({{ complaints|length }})</button>
+                    <button type="button" class="filter-pill" onclick="filterDeptTable('Pending', this)">Pending</button>
+                    <button type="button" class="filter-pill" onclick="filterDeptTable('In Progress', this)">In Progress</button>
+                    <button type="button" class="filter-pill" onclick="filterDeptTable('Resolved', this)">Resolved</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="civic-table" id="deptTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 65px;">ID</th>
+                            <th>Complaint Details</th>
+                            <th>Category</th>
+                            <th>Hazard Priority</th>
+                            <th>Location</th>
+                            <th>Resolution Status</th>
+                            <th>Date</th>
+                            <th style="text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if complaints %}
+                        {% for c in complaints %}
+                        <tr class="dept-row" data-status="{{ c.status }}">
+                            <td><strong class="id-tag">#{{ c.id }}</strong></td>
+                            <td>
+                                <div class="complaint-title-cell">
+                                    <strong>{{ c.title }}</strong>
+                                    <p class="desc-snippet">{{ c.description[:85] }}...</p>
+                                    <span class="sub-author">By: {{ c.submitted_by or 'Citizen' }} ({{ c.phone or 'Phone on file' }})</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="category-pill">{{ c.category }}</span>
+                            </td>
+                            <td>
+                                {% if c.priority_level == 'HIGH' or c.priority >= 7 %}
+                                <span class="civic-prio-badge badge-high">🔴 HIGH</span>
+                                {% elif c.priority_level == 'LOW' or c.priority < 4 %}
+                                <span class="civic-prio-badge badge-low">🟢 LOW</span>
+                                {% else %}
+                                <span class="civic-prio-badge badge-medium">🟡 MEDIUM</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="location-text">📍 {{ c.location }}</span>
+                            </td>
+                            <td>
+                                <!-- 1-click status update dropdown -->
+                                <select class="status-select-civic" onchange="updateDeptStatus('{{ c.id }}', this.value, this)">
+                                    <option value="Pending" {% if c.status == 'Pending' %}selected{% endif %}>⏳ Pending</option>
+                                    <option value="In Progress" {% if c.status == 'In Progress' %}selected{% endif %}>⚙️ In Progress</option>
+                                    <option value="Resolved" {% if c.status == 'Resolved' %}selected{% endif %}>✓ Resolved</option>
+                                    <option value="Rejected/Cancelled" {% if c.status == 'Rejected/Cancelled' %}selected{% endif %}>❌ Rejected/Cancelled</option>
+                                </select>
+                            </td>
+                            <td>
+                                <span class="date-text">{{ c.created_at[:10] if c.created_at else 'Recent' }}</span>
+                            </td>
+                            <td style="text-align: right;">
+                                <a href="{{ url_for('complaint_details', complaint_id=c.id) }}" class="btn-table-view">
+                                    Details →
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 40px 20px;">
+                                <div class="empty-state-box">
+                                    <span style="font-size: 40px; display: block; margin-bottom: 10px;">{{ dept_info.icon }}</span>
+                                    <h4 style="color: #1e293b; margin-bottom: 6px;">No Grievances Found for {{ dept_info.title }}</h4>
+                                    <p style="color: #64748b; font-size: 14px;">All grievances for this department have either been resolved or no new reports have been filed.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Leaflet GIS Script -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const mapContainer = document.getElementById('deptGisMap');
+            if (!mapContainer) return;
+
+            const map = L.map('deptGisMap').setView([14.42, 74.42], 8);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            const complaintsData = {{ complaints|tojson }};
+            let markersGroup = L.featureGroup();
+
+            complaintsData.forEach(c => {
+                const lat = parseFloat(c.latitude);
+                const lon = parseFloat(c.longitude);
+
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    let color = '#3b82f6';
+                    if (c.priority_level === 'HIGH' || c.priority >= 7) color = '#ef4444';
+                    else if (c.status === 'Resolved') color = '#10b981';
+                    else if (c.priority_level === 'MEDIUM') color = '#f59e0b';
+
+                    const marker = L.circleMarker([lat, lon], {
+                        radius: 8,
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }).addTo(markersGroup);
+
+                    marker.bindPopup(`
+                        <div style="font-family: inherit; font-size: 13px; line-height: 1.4;">
+                            <strong style="color: #1e293b;">#${c.id}: ${c.title}</strong><br>
+                            <span style="color: #64748b;">📍 ${c.location}</span><br>
+                            <span style="font-weight: 600;">Category:</span> ${c.category}<br>
+                            <span style="font-weight: 600;">Priority:</span> ${c.priority_level} | <strong>Status:</strong> ${c.status}<br>
+                            <a href="/complaint/${c.id}" style="color: #2563eb; font-weight: 600; display: inline-block; margin-top: 5px;">View Details →</a>
+                        </div>
+                    `);
+                }
+            });
+
+            if (markersGroup.getLayers().length > 0) {
+                markersGroup.addTo(map);
+                map.fitBounds(markersGroup.getBounds().pad(0.15));
+            }
+        });
+
+        function filterDeptTable(status, btn) {
+            if (btn) {
+                const pills = document.querySelectorAll('.filter-pill');
+                pills.forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+            }
+
+            const rows = document.querySelectorAll('.dept-row');
+            rows.forEach(row => {
+                const rowStatus = row.getAttribute('data-status');
+                if (status === 'all' || rowStatus === status) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        async function updateDeptStatus(id, newStatus, selectEl) {
+            selectEl.disabled = true;
+            try {
+                const res = await fetch(`/admin/complaint/${id}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    selectEl.style.borderColor = '#10b981';
+                    const tr = selectEl.closest('tr');
+                    if (tr) tr.setAttribute('data-status', newStatus);
+                    setTimeout(() => { selectEl.style.borderColor = ''; }, 1000);
+                } else {
+                    alert('Error updating status: ' + (data.message || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Connection error while updating status');
+            } finally {
+                selectEl.disabled = false;
+            }
+        }
+    </script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

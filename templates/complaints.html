@@ -69,122 +69,69 @@
         }
     </style>
 </head>
-<body class="app-body">
-    <!-- Top Civic Government Header -->
-    <header class="civic-topbar">
-        <div class="container civic-topbar-inner">
-            <div class="civic-flag">
-                <span class="flag-stripe orange"></span>
-                <span class="flag-stripe white"></span>
-                <span class="flag-stripe green"></span>
-                <span class="topbar-text">Public Grievances Registry • Rural Areas & Gram Panchayats</span>
-            </div>
-            <div class="topbar-right">
-                <div class="lang-switcher-nav">
-                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
-                    <span class="lang-divider">|</span>
-                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
-                </div>
-            </div>
-        </div>
-    </header>
-
+<body>
     <nav class="navbar">
-        <div class="container navbar-container">
-            <a href="{{ url_for('index') }}" class="brand-link">
-                <div class="brand-badge">GC</div>
-                <div class="brand-text">
-                    <span class="brand-title">GrievanceConnect</span>
-                    <span class="brand-subtitle">Public Complaints</span>
-                </div>
-            </a>
-
+        <div class="container">
+            <div class="brand">GrievanceConnect</div>
             <ul class="nav-links">
                 <li><a href="{{ url_for('index') }}">Home</a></li>
-                {% if session.get('user_id') %}
-                    {% if session.get('role') == 'admin' %}
-                        <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
-                    {% else %}
-                        <li><a href="{{ url_for('dashboard') }}">Citizen Dashboard</a></li>
-                        <li><a href="{{ url_for('new_complaint') }}">Submit Complaint</a></li>
-                    {% endif %}
-                    <li><a href="{{ url_for('logout') }}" class="nav-btn-outline">Logout</a></li>
-                {% else %}
-                    <li><a href="{{ url_for('new_complaint') }}">Submit Complaint</a></li>
-                    <li><a href="{{ url_for('login') }}">Login</a></li>
-                    <li><a href="{{ url_for('admin_login') }}" class="nav-btn-admin">Admin Portal</a></li>
-                {% endif %}
+                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('new_complaint') }}">New Complaint</a></li>
+                <li><a href="{{ url_for('logout') }}">Logout</a></li>
             </ul>
         </div>
     </nav>
 
-    <div class="container" style="margin-top: 28px; margin-bottom: 40px;">
+    <div class="container">
+        <!-- Back to Dashboard -->
+        <div style="margin: 16px 0 8px 0;">
+            <a href="{{ url_for('dashboard') }}" class="civic-back-btn">← Back to Dashboard</a>
+        </div>
         <div class="page-header">
-            <div>
-                <h2 class="section-title">Grievance Registry</h2>
-                <p class="section-subtext">Comprehensive listing of reported community grievances and current redressal status</p>
-            </div>
+            <h2 class="section-title">All Complaints</h2>
             <div class="sort-controls">
                 <button type="button" class="sort-btn active" data-sort="latest" onclick="sortComplaints('latest', this)">📅 Latest</button>
-                <button type="button" class="sort-btn" data-sort="priority" onclick="sortComplaints('priority', this)">🔴 By Urgency</button>
+                <button type="button" class="sort-btn" data-sort="priority" onclick="sortComplaints('priority', this)">🔴 By Priority</button>
                 <button type="button" class="sort-btn" data-sort="status" onclick="sortComplaints('status', this)">📊 By Status</button>
             </div>
         </div>
 
         {% if complaints %}
-        <div class="table-responsive">
-            <table class="table modern-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Title / Issue</th>
-                        <th>AI Category</th>
-                        <th>Location</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="complaintsTable">
-                    {% for complaint in complaints | sort(attribute='priority', reverse=True) %}
-                    {% set priority = complaint.priority | int if complaint.priority else 0 %}
-                    <tr class="complaint-row" data-priority="{{ priority }}" data-status="{{ complaint.status }}" data-created="{{ complaint.created_at }}">
-                        <td><strong>#{{ complaint.id }}</strong></td>
-                        <td>
-                            <div class="complaint-title-text">{{ complaint.title }}</div>
-                            {% if complaint.is_voice_complaint == 1 %}
-                            <span class="badge-voice">🎤 Voice</span>
-                            {% endif %}
-                            {% if complaint.image_path %}
-                            <span class="badge-photo">📷 Photo</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="category-tag">{{ complaint.ai_category or complaint.category }}</span>
-                        </td>
-                        <td>📍 {{ complaint.location or 'Rural Area' }}</td>
-                        <td>
-                            <span class="priority-badge priority-{% if priority >= 7 %}high{% elif priority >= 4 %}medium{% else %}low{% endif %}">
-                                {% if priority >= 7 %}🔴 High{% elif priority >= 4 %}🟡 Medium{% else %}🟢 Normal{% endif %}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="status-pill status-{{ (complaint.status or 'pending').lower().replace(' ', '-') }}">
-                                {{ complaint.status or 'Pending' }}
-                            </span>
-                        </td>
-                        <td>
-                            <a href="{{ url_for('complaint_details', complaint_id=complaint.id) }}" class="btn-action-view">View Details →</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="complaintsTable">
+                {% for complaint in complaints | sort(attribute='priority', reverse=True) %}
+                <tr class="complaint-row" data-priority="{{ complaint.priority }}" data-status="{{ complaint.status }}" data-created="{{ complaint.created_at }}">
+                    <td>#{{ complaint.id }}</td>
+                    <td>
+                        {{ complaint.title }}
+                        {% if complaint.is_voice_complaint == 1 %}
+                        <span class="voice-indicator">🎤 Voice</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ complaint.ai_category or complaint.category }}</td>
+                    <td>
+                        <span class="priority-badge priority-{% if complaint.priority >= 7 %}high{% elif complaint.priority >= 4 %}medium{% else %}low{% endif %}">
+                            {% if complaint.priority >= 7 %}🔴 High{% elif complaint.priority >= 4 %}🟡 Medium{% else %}🟢 Low{% endif %}
+                        </span>
+                    </td>
+                    <td><span class="status {{ complaint.status.lower().replace(' ', '-') }}">{{ complaint.status }}</span></td>
+                    <td><a href="{{ url_for('complaint_details', complaint_id=complaint.id) }}">Details</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         {% else %}
-        <div class="empty-state">
-            <p>No complaints available in this view.</p>
-        </div>
+        <p>No complaints available.</p>
         {% endif %}
     </div>
 

@@ -130,48 +130,22 @@
         }
     </style>
 </head>
-<body class="app-body">
-    <!-- Top Civic Government Header -->
-    <header class="civic-topbar admin-topbar-civic">
-        <div class="container civic-topbar-inner">
-            <div class="civic-flag">
-                <span class="flag-stripe orange"></span>
-                <span class="flag-stripe white"></span>
-                <span class="flag-stripe green"></span>
-                <span class="topbar-text">District Administration & Gram Panchayat Command Portal</span>
-            </div>
-            <div class="topbar-right">
-                <div class="lang-switcher-nav">
-                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
-                    <span class="lang-divider">|</span>
-                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <nav class="navbar navbar-admin">
-        <div class="container navbar-container">
-            <a href="{{ url_for('index') }}" class="brand-link">
-                <div class="brand-badge admin-badge-color">ADM</div>
-                <div class="brand-text">
-                    <span class="brand-title">GrievanceConnect</span>
-                    <span class="brand-subtitle">Administrator Portal</span>
-                </div>
-            </a>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="brand">GrievanceConnect</div>
             <ul class="nav-links">
                 <li><a href="{{ url_for('index') }}">Home</a></li>
-                <li><a href="{{ url_for('login') }}">Citizen Login</a></li>
-                <li><a href="{{ url_for('complaints') }}">Public Issues</a></li>
+                <li><a href="{{ url_for('phone_login') }}">Citizen Login</a></li>
             </ul>
         </div>
     </nav>
 
     <div class="login-container">
         <div class="login-header">
-            <div class="admin-badge">🔐 GRAM PANCHAYAT ADMIN</div>
-            <h2>Officer Authentication</h2>
-            <p>Authorized access for Taluk / Gram Panchayat officers</p>
+            <div class="admin-badge">🔐 ADMIN PORTAL</div>
+            <h2>Admin Access</h2>
+            <p>Restricted to authorized administrators</p>
         </div>
 
         {% if error %}
@@ -180,20 +154,18 @@
 
         <form method="POST" action="{{ url_for('admin_login') }}">
             <div class="form-group">
-                <label for="email">Admin Email Address</label>
+                <label for="email">Email Address</label>
                 <input 
                     type="email" 
                     id="email" 
                     name="email" 
-                    placeholder="admin@grievanceconnect.com" 
-                    value="{{ request.form.get('email', '') }}"
+                    placeholder="admin@example.com" 
                     required
-                    autofocus
                 >
             </div>
 
             <div class="form-group">
-                <label for="password">Admin Password</label>
+                <label for="password">Password</label>
                 <input 
                     type="password" 
                     id="password" 
@@ -203,26 +175,18 @@
                 >
             </div>
 
-            <button type="submit" class="btn-submit">Login as Administrator</button>
+            <button type="submit" class="btn-submit">Login as Admin</button>
         </form>
 
-        <div class="demo-credentials-box" style="margin-top: 20px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:12px; font-size:12px;">
-            <strong style="color:#0369a1;">📌 Demo Admin Credentials:</strong>
-            <div style="margin-top:4px; font-family:monospace; color:#0f172a;">
-                Email: <b>admin@grievanceconnect.com</b><br>
-                Password: <b>admin123</b>
-            </div>
-        </div>
-
-        <div class="security-note" style="margin-top: 15px;">
-            🛡️ Authorized government personnel only. All access actions are logged.
+        <div class="security-note">
+            🛡️ This is a restricted area. Only authorized administrators can access this portal.
         </div>
 
         <div class="divider">or</div>
 
         <div class="login-links">
             <a href="{{ url_for('index') }}">← Back to Home</a>
-            <a href="{{ url_for('login') }}">Citizen Login →</a>
+            <a href="{{ url_for('phone_login') }}">Citizen Login →</a>
         </div>
     </div>
 

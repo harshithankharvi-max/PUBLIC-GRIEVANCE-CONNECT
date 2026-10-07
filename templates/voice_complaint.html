@@ -269,45 +269,13 @@
         }
     </style>
 </head>
-<body class="app-body">
-    <!-- Top Civic Government Header -->
-    <header class="civic-topbar">
-        <div class="container civic-topbar-inner">
-            <div class="civic-flag">
-                <span class="flag-stripe orange"></span>
-                <span class="flag-stripe white"></span>
-                <span class="flag-stripe green"></span>
-                <span class="topbar-text">Public Grievance Voice Reporting • Rural Multilingual Support</span>
-            </div>
-            <div class="topbar-right">
-                <div class="lang-switcher-nav">
-                    <button type="button" class="lang-pill active" onclick="setLanguage('en')">English</button>
-                    <span class="lang-divider">|</span>
-                    <button type="button" class="lang-pill" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <nav class="navbar">
-        <div class="container navbar-container">
-            <a href="{{ url_for('index') }}" class="brand-link">
-                <div class="brand-badge">GC</div>
-                <div class="brand-text">
-                    <span class="brand-title">GrievanceConnect</span>
-                    <span class="brand-subtitle">Voice Grievance</span>
-                </div>
-            </a>
-            <ul class="nav-links">
-                <li><a href="{{ url_for('index') }}">Home</a></li>
-                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                <li><a href="{{ url_for('new_complaint') }}">Text Complaint</a></li>
-                <li><a href="{{ url_for('complaints') }}">My Complaints</a></li>
-            </ul>
-        </div>
-    </nav>
-
+<body>
     <div class="voice-container">
+        <div style="margin-bottom: 16px;">
+            <a href="{{ url_for('dashboard') }}" class="civic-back-btn civic-back-btn-light">
+                ← Back to Dashboard
+            </a>
+        </div>
         <h2>🎤 Voice-Based Complaint</h2>
         
         {% if error %}
@@ -325,27 +293,36 @@
                 <!-- Recording Controls -->
                 <div class="voice-section">
                     <label>Step 1: Record Your Complaint</label>
+                    <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span style="font-size: 13px; color: white;">Language / ಭಾಷೆ:</span>
+                        <select id="voiceLangSelect" style="padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.25); color: white; border: 1px solid rgba(255,255,255,0.3); font-weight: 600;">
+                            <option value="en-IN" selected style="color: #111;">English (India)</option>
+                            <option value="kn-IN" style="color: #111;">ಕನ್ನಡ (Kannada)</option>
+                        </select>
+                    </div>
                     <div class="recording-controls">
-                        <button type="button" class="voice-btn voice-btn-primary" id="startBtn" onclick="startRecording()">
-                            🎙️ Start Recording
-                        </button>
-                        <button type="button" class="voice-btn voice-btn-secondary" id="stopBtn" onclick="stopRecording()" disabled>
-                            ⏹️ Stop Recording
+                        <button type="button" class="voice-btn voice-btn-primary" id="startBtn" onclick="startVoiceRecording()">
+                            🎙️ START RECORDING
                         </button>
                     </div>
                     <div class="recording-status" id="recordingStatus" style="display: none;">
                         <span class="recording-indicator"></span>
-                        <span id="recordingTime">Recording: 00:00</span>
+                        <span id="recordingTime">Listening... Speak now</span>
                     </div>
                 </div>
                 
                 <!-- Transcription Result -->
                 <div class="voice-section" id="transcriptionSection" style="display: none;">
-                    <label>Step 2: Review Transcription</label>
-                    <div class="transcription-result">
-                        <p id="transcriptionText"></p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">Step 2: Detailed Description / ವಿವರವಾದ ದೂರು</label>
+                        <button type="button" class="btn-clear-desc-voice" onclick="clearVoiceDescription()" title="Clear description">
+                            ✕ Clear
+                        </button>
                     </div>
-                    <textarea name="description" id="descriptionText" placeholder="Edit or confirm the transcribed text..." required></textarea>
+                    <div style="position: relative;">
+                        <textarea name="description" id="descriptionText" placeholder="Edit or confirm the transcribed text..." required style="padding-right: 38px;"></textarea>
+                        <button type="button" class="voice-textarea-clear-x" onclick="clearVoiceDescription()" title="Clear description (X)">✕</button>
+                    </div>
                 </div>
                 
                 <!-- Location -->
@@ -446,68 +423,124 @@
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script>
-        let mediaRecorder;
-        let audioChunks = [];
-        let latestAudioBlob = null;
-        let recordingStartTime;
-        let recordingTimer;
+        let recognition = null;
+        let isVoiceRecording = false;
+        let voiceSilenceTimer = null;
         
-        async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-                
-                mediaRecorder.onstop = async () => {
-                    const rawBlob = new Blob(audioChunks); // actual recorded blob (may be webm/ogg)
-                    try {
-                        const wavBlob = await convertToWav(rawBlob);
-                        latestAudioBlob = wavBlob;
-                        await transcribeAudio(wavBlob);
-                    } catch (err) {
-                        // Fallback: try sending raw blob if conversion fails
-                        latestAudioBlob = rawBlob;
-                        await transcribeAudio(rawBlob);
-                    } finally {
-                        stream.getTracks().forEach(track => track.stop());
+        function startVoiceRecording() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
+                return;
+            }
+
+            if (isVoiceRecording) {
+                stopVoiceRecording();
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            const langSelect = document.getElementById('voiceLangSelect');
+            recognition.lang = langSelect ? langSelect.value : 'en-IN';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            const startBtn = document.getElementById('startBtn');
+            const statusBox = document.getElementById('recordingStatus');
+            const descArea = document.getElementById('descriptionText');
+            let initialText = descArea.value;
+
+            startBtn.classList.add('recording');
+            startBtn.innerHTML = '🎙️ Listening... Speak now';
+            statusBox.style.display = 'block';
+            document.getElementById('recordingTime').textContent = 'Listening... Speech will auto-stop when you finish';
+            isVoiceRecording = true;
+
+            recognition.onresult = (event) => {
+                let interim = '';
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interim += event.results[i][0].transcript;
                     }
-                };
-                
-                mediaRecorder.start();
-                recordingStartTime = Date.now();
-                updateRecordingTime();
-                
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('stopBtn').disabled = false;
-                document.getElementById('recordingStatus').style.display = 'block';
-                
-            } catch (error) {
-                alert('Error accessing microphone: ' + error.message);
+                }
+
+                if (finalTranscript) {
+                    descArea.value = (initialText ? initialText + ' ' : '') + finalTranscript;
+                    document.getElementById('transcriptionSection').style.display = 'block';
+                    document.getElementById('transcriptionText').textContent = descArea.value;
+                    classifyComplaint(descArea.value);
+                } else if (interim) {
+                    descArea.value = (initialText ? initialText + ' ' : '') + interim;
+                    document.getElementById('transcriptionSection').style.display = 'block';
+                    document.getElementById('transcriptionText').textContent = descArea.value;
+                }
+
+                clearTimeout(voiceSilenceTimer);
+                voiceSilenceTimer = setTimeout(() => {
+                    if (isVoiceRecording) {
+                        stopVoiceRecording();
+                    }
+                }, 2200);
+            };
+
+            recognition.onspeechend = () => {
+                setTimeout(() => {
+                    if (isVoiceRecording) {
+                        stopVoiceRecording();
+                    }
+                }, 800);
+            };
+
+            recognition.onerror = (event) => {
+                console.warn('Speech recognition notice:', event.error);
+                stopVoiceRecording();
+            };
+
+            recognition.onend = () => {
+                if (isVoiceRecording) {
+                    stopVoiceRecording();
+                }
+            };
+
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error('Error starting recognition:', e);
+                stopVoiceRecording();
             }
         }
-        
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('stopBtn').disabled = true;
-                clearInterval(recordingTimer);
-                document.getElementById('recordingStatus').style.display = 'none';
+
+        function stopVoiceRecording() {
+            clearTimeout(voiceSilenceTimer);
+            if (recognition) {
+                try { recognition.stop(); } catch(e) {}
+            }
+            isVoiceRecording = false;
+
+            const startBtn = document.getElementById('startBtn');
+            const statusBox = document.getElementById('recordingStatus');
+
+            if (startBtn) {
+                startBtn.classList.remove('recording');
+                startBtn.innerHTML = '🎙️ START RECORDING';
+            }
+            if (statusBox) {
+                statusBox.style.display = 'none';
             }
         }
-        
-        function updateRecordingTime() {
-            recordingTimer = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 60;
-                document.getElementById('recordingTime').textContent = 
-                    `Recording: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            }, 1000);
+
+        function clearVoiceDescription() {
+            const descArea = document.getElementById('descriptionText');
+            if (descArea) {
+                descArea.value = '';
+                descArea.focus();
+                document.getElementById('transcriptionText').textContent = '';
+                const aiResult = document.getElementById('aiResult');
+                if (aiResult) aiResult.style.display = 'none';
+            }
         }
         
         async function transcribeAudio(audioBlob) {

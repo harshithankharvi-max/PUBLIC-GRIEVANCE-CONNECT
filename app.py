@@ -2,15 +2,45 @@ import os
 import sqlite3
 import json
 from datetime import datetime, timedelta
-from geopy.geocoders import Nominatim
-from geopy.extra.rate_limiter import RateLimiter
+
+# Optional geopy import – provide fallbacks if the library is unavailable
+try:
+    from geopy.geocoders import Nominatim
+    from geopy.extra.rate_limiter import RateLimiter
+except ImportError:  # pragma: no cover
+    class Nominatim:
+        def __init__(self, user_agent=None):
+            pass
+        def reverse(self, location, language='en'):
+            return None
+    class RateLimiter:
+        def __init__(self, func, min_delay_seconds=1):
+            self.func = func
+        def __call__(self, *args, **kwargs):
+            return self.func(*args, **kwargs)
+except ImportError:  # pragma: no cover
+    class Nominatim:
+        def __init__(self, user_agent=None):
+            pass
+        def reverse(self, location, language='en'):
+            return None
+    class RateLimiter:
+        def __init__(self, func, min_delay_seconds=1):
+            self.func = func
+        def __call__(self, *args, **kwargs):
+            return self.func(*args, **kwargs)
+
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+
+import json
+from datetime import datetime, timedelta
 
 from flask import Flask, g, redirect, render_template, request, session, url_for, jsonify
 from dotenv import load_dotenv
 
 from models import ComplaintClassifier, VoiceProcessor
+from models.classifier import get_department_for_category, CATEGORY_DEPARTMENT_MAP, DEPARTMENTS, REJECTION_MESSAGE
 
 # Load environment variables
 load_dotenv()
@@ -39,8 +69,9 @@ from services.otp_service import otp_service
 # Import authorization decorators
 from utils.auth_decorators import admin_required, citizen_required, login_required
 
+
 def verify_user_password(stored_password, provided_password):
-    """Safely verify passwords supporting both plain text and secure hashes"""
+    """Safely verify passwords supporting both plain-text legacy and bcrypt hashes."""
     if not stored_password or not provided_password:
         return False
     if stored_password == provided_password:
@@ -49,6 +80,7 @@ def verify_user_password(stored_password, provided_password):
         return check_password_hash(stored_password, provided_password)
     except Exception:
         return False
+
 
 def allowed_file(filename, allowed_extensions=None):
     allowed_extensions = allowed_extensions or ALLOWED_EXTENSIONS
@@ -128,6 +160,7 @@ def init_db():
             user_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             category TEXT NOT NULL,
+            department TEXT,
             location TEXT NOT NULL,
             description TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'Pending',
@@ -154,6 +187,8 @@ def init_db():
             user_additions.append("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'citizen'")
         if 'phone_verified' not in existing_cols:
             user_additions.append("ALTER TABLE users ADD COLUMN phone_verified BOOLEAN DEFAULT 0")
+        if 'department' not in existing_cols:
+            user_additions.append("ALTER TABLE users ADD COLUMN department TEXT")
 
         for stmt in user_additions:
             try:
@@ -168,6 +203,8 @@ def init_db():
         existing_cols = {row['name'] for row in existing}
 
         additions = []
+        if 'department' not in existing_cols:
+            additions.append("ALTER TABLE complaints ADD COLUMN department TEXT")
         if 'ai_category' not in existing_cols:
             additions.append("ALTER TABLE complaints ADD COLUMN ai_category TEXT")
         if 'voice_note_path' not in existing_cols:
@@ -188,35 +225,109 @@ def init_db():
             additions.append("ALTER TABLE complaints ADD COLUMN status TEXT NOT NULL DEFAULT 'Pending'")
         if 'created_at' not in existing_cols:
             additions.append("ALTER TABLE complaints ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        if 'manual_status' not in existing_cols:
+            additions.append("ALTER TABLE complaints ADD COLUMN manual_status BOOLEAN DEFAULT 0")
 
         for stmt in additions:
             try:
                 db.execute(stmt)
             except Exception:
-                # If column already exists due to race or prior run, ignore
                 pass
     except Exception:
-        # If anything goes wrong while migrating schema, continue; table creation above suffices
         pass
 
-    # Create default admin user if not exists (with hashed password)
+    # Create default admin user if not exists
     existing_admin = db.execute("SELECT id FROM users WHERE email = 'admin@grievanceconnect.com'").fetchone()
     if not existing_admin:
         hashed_pwd = generate_password_hash('admin123')
         db.execute(
             '''
-            INSERT INTO users (id, name, email, phone, password, role, phone_verified)
-            VALUES (?, ?, ?, ?, ?, 'admin', 1)
+            INSERT INTO users (id, name, email, phone, password, role, phone_verified, department)
+            VALUES (?, ?, ?, ?, ?, 'admin', 1, 'ALL')
             ''',
             (1, 'Admin User', 'admin@grievanceconnect.com', '9999999999', hashed_pwd)
         )
     else:
-        # Ensure existing admin has correct role
+        db.execute("UPDATE users SET role = 'admin', department = 'ALL' WHERE email = 'admin@grievanceconnect.com'")
+
+    # Seed the 3 Department Authority Officers
+    dept_authorities = [
+        ('Electricity Authority Officer', 'electricity@grievanceconnect.com', '9999900001', 'elec123', 'authority', 'ELECTRICITY'),
+        ('PWD Infrastructure Officer', 'pwd@grievanceconnect.com', '9999900002', 'pwd123', 'authority', 'PWD'),
+        ('Water & Sanitation Officer', 'water@grievanceconnect.com', '9999900003', 'water123', 'authority', 'WATER'),
+    ]
+    for name, email, phone, pwd, role, dept in dept_authorities:
+        existing_auth = db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+        if not existing_auth:
+            h_pwd = generate_password_hash(pwd)
+            db.execute(
+                '''
+                INSERT INTO users (name, email, phone, password, role, phone_verified, department)
+                VALUES (?, ?, ?, ?, ?, 1, ?)
+                ''',
+                (name, email, phone, h_pwd, role, dept)
+            )
+        else:
+            db.execute("UPDATE users SET role = ?, department = ? WHERE email = ?", (role, dept, email))
+
+    # Create default guest citizen for skip-login / instant reporting
+    existing_guest = db.execute("SELECT id FROM users WHERE email = 'guest@grievanceconnect.local'").fetchone()
+    if not existing_guest:
+        hashed_guest = generate_password_hash('guest123')
         db.execute(
-            "UPDATE users SET role = 'admin' WHERE email = 'admin@grievanceconnect.com'"
+            '''
+            INSERT INTO users (name, email, phone, password, role, phone_verified)
+            VALUES (?, ?, ?, ?, 'citizen', 1)
+            ''',
+            ('Rural Citizen', 'guest@grievanceconnect.local', '9999999000', hashed_guest)
         )
     
     db.commit()
+
+
+def sync_automatic_statuses(db):
+    """
+    Automatic time-based status progression for college demonstration:
+    - 0 to 10 minutes -> Pending
+    - 10 to 20 minutes -> In Progress
+    - More than 20 minutes -> Resolved
+    Preserves manual override if manual_status == 1 or status is 'Rejected/Cancelled'.
+    """
+    try:
+        now = datetime.utcnow()
+        rows = db.execute(
+            """
+            SELECT id, created_at, status 
+            FROM complaints 
+            WHERE (manual_status IS NULL OR manual_status = 0)
+              AND status != 'Rejected/Cancelled'
+            """
+        ).fetchall()
+        for r in rows:
+            created_str = r['created_at']
+            if not created_str:
+                continue
+            try:
+                clean_str = str(created_str).replace('T', ' ')[:19]
+                dt = datetime.strptime(clean_str, '%Y-%m-%d %H:%M:%S')
+                diff_mins = (now - dt).total_seconds() / 60.0
+                if diff_mins < 0:
+                    diff_mins = 0
+                
+                if diff_mins < 10:
+                    new_status = 'Pending'
+                elif diff_mins < 20:
+                    new_status = 'In Progress'
+                else:
+                    new_status = 'Resolved'
+                    
+                if r['status'] != new_status:
+                    db.execute("UPDATE complaints SET status = ? WHERE id = ?", (new_status, r['id']))
+            except Exception:
+                pass
+        db.commit()
+    except Exception:
+        pass
 
 
 def reverse_geocode(lat, lon):
@@ -322,9 +433,29 @@ def resend_otp():
         return jsonify({'success': False, 'message': result['message']})
 
 
+@app.route('/skip-login')
+def skip_login():
+    """Allow citizen to file complaint without upfront login (guest citizen flow)."""
+    db = get_db()
+    guest = db.execute("SELECT * FROM users WHERE email = 'guest@grievanceconnect.local'").fetchone()
+    if guest:
+        session['user_id'] = guest['id']
+        session['user_name'] = guest['name']
+        session['role'] = 'citizen'
+        session.permanent = True
+    return redirect(url_for('new_complaint'))
+
+
+
+
+# Authority selection entry point
+@app.route('/authority/select')
+def authority_select():
+    """Render a page where authority users choose their department before logging in."""
+    return render_template('authority_select.html')
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
-    """Secure admin login with email and password"""
+    """Secure admin login with email and password supporting hashed & plain passwords."""
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
@@ -337,7 +468,6 @@ def admin_login():
             (email, 'admin')
         ).fetchone()
         
-        if user and check_password_hash(user['password'], password):
         if user and verify_user_password(user['password'], password):
             session['user_id'] = user['id']
             session['user_name'] = user['name']
@@ -354,8 +484,8 @@ def admin_login():
 @app.route('/admin/dashboard')
 @admin_required
 def admin_dashboard():
-    """Admin-only dashboard showing all complaints"""
-    """Admin-only dashboard showing all complaints with geospatial map and status control"""
+    sync_automatic_statuses(get_db())
+    """Admin Executive Dashboard showing all complaints, GIS metrics, and 3 Department Portals."""
     complaints = get_db().execute(
         '''
         SELECT c.*, u.name AS submitted_by, u.phone
@@ -365,60 +495,235 @@ def admin_dashboard():
         '''
     ).fetchall()
     
-    complaint_list = [dict(c) for c in complaints]
-    
+    complaint_list = []
+    for c in complaints:
+        c_dict = dict(c)
+        dept = c_dict.get('department') or get_department_for_category(c_dict.get('category'))
+        c_dict['department'] = dept
+        p = c_dict.get('priority') or 0
+        if p >= 7:
+            c_dict['priority_level'] = 'HIGH'
+        elif p >= 4:
+            c_dict['priority_level'] = 'MEDIUM'
+        else:
+            c_dict['priority_level'] = 'LOW'
+        complaint_list.append(c_dict)
+
     stats = {
-        'total': len(complaints),
-        'pending': len([c for c in complaints if c['status'] == 'Pending']),
-        'in_progress': len([c for c in complaints if c['status'] == 'In Progress']),
-        'resolved': len([c for c in complaints if c['status'] == 'Resolved']),
-        'high_priority': len([c for c in complaints if c['priority'] >= 7]),
         'total': len(complaint_list),
         'pending': len([c for c in complaint_list if c['status'] == 'Pending']),
         'in_progress': len([c for c in complaint_list if c['status'] == 'In Progress']),
         'resolved': len([c for c in complaint_list if c['status'] == 'Resolved']),
-        'high_priority': len([c for c in complaint_list if (c.get('priority') or 0) >= 7]),
-        'geo_tagged': len([c for c in complaint_list if c.get('latitude') is not None and c.get('latitude') != ''])
+        'high_priority': len([c for c in complaint_list if c['priority_level'] == 'HIGH']),
+        'medium_priority': len([c for c in complaint_list if c['priority_level'] == 'MEDIUM']),
+        'low_priority': len([c for c in complaint_list if c['priority_level'] == 'LOW']),
+        'electricity_count': len([c for c in complaint_list if c['department'] == 'ELECTRICITY']),
+        'pwd_count': len([c for c in complaint_list if c['department'] == 'PWD']),
+        'water_count': len([c for c in complaint_list if c['department'] == 'WATER']),
     }
     
-    return render_template('admin_dashboard.html', stats=stats, complaints=[dict(c) for c in complaints])
-    # Category breakdown
-    categories = {}
-    for c in complaint_list:
-        cat = c.get('ai_category') or c.get('category') or 'Other'
-        categories[cat] = categories.get(cat, 0) + 1
-    
+    return render_template('admin_dashboard.html', stats=stats, complaints=complaint_list)
+
+
+@app.route('/admin/department/<dept_name>/login', methods=['GET', 'POST'])
+def admin_department_login(dept_name):
+    """Dedicated login for each of the 3 Authority Departments: ELECTRICITY, PWD, WATER"""
+    dept_upper = dept_name.upper().strip()
+    if dept_upper not in ['ELECTRICITY', 'PWD', 'WATER']:
+        return redirect(url_for('index'))
+
+    dept_meta = {
+        'ELECTRICITY': {
+            'title': 'ELECTRICITY DEPARTMENT',
+            'kannada_title': 'ವಿದ್ಯುತ್ ಇಲಾಖೆ ಪ್ರಾಧಿಕಾರ',
+            'icon': '⚡',
+            'badge': 'Energy & Power Infrastructure Redressal',
+            'color': '#f59e0b',
+            'demo_email': 'electricity@grievanceconnect.com',
+            'demo_pass': 'elec123',
+            'categories': ['Electricity / Power Supply', 'Streetlight']
+        },
+        'PWD': {
+            'title': 'PWD INFRASTRUCTURE',
+            'kannada_title': 'ಲೋಕೋಪಯೋಗಿ ಇಲಾಖೆ (PWD) ಪ್ರಾಧಿಕಾರ',
+            'icon': '🏗️',
+            'badge': 'Roads & Public Infrastructure Redressal',
+            'color': '#3b82f6',
+            'demo_email': 'pwd@grievanceconnect.com',
+            'demo_pass': 'pwd123',
+            'categories': ['Road Damage', 'Drainage / Public Infrastructure', 'Other PWD / Public Infrastructure']
+        },
+        'WATER': {
+            'title': 'WATER & SANITATION',
+            'kannada_title': 'ಜಲಮಂಡಳಿ ಮತ್ತು ನೈರ್ಮಲ್ಯ ಪ್ರಾಧಿಕಾರ',
+            'icon': '💧',
+            'badge': 'Potable Water & Contamination Redressal',
+            'color': '#06b6d4',
+            'demo_email': 'water@grievanceconnect.com',
+            'demo_pass': 'water123',
+            'categories': ['Water Supply', 'Water Leakage / Pipeline', 'Water Quality / Contamination']
+        }
+    }
+
+    error = request.args.get('error')
+
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+
+        if not email or not password:
+            return render_template('department_login.html', 
+                                   department=dept_upper, 
+                                   dept_info=dept_meta[dept_upper],
+                                   error='Email and password are required.')
+
+        user = get_db().execute(
+            'SELECT * FROM users WHERE email = ?',
+            (email,)
+        ).fetchone()
+
+        if user and verify_user_password(user['password'], password):
+            u_role = user['role']
+            u_dept = (user['department'] or '').upper()
+
+            # Master admin can access any department; Department officer only accesses their assigned dept
+            if u_role == 'admin' or u_dept == dept_upper:
+                session['user_id'] = user['id']
+                session['user_name'] = user['name']
+                session['role'] = u_role if u_role == 'admin' else 'authority'
+                session['department'] = dept_upper
+                session.permanent = True
+                return redirect(url_for('admin_department_portal', dept_name=dept_name.lower()))
+            else:
+                return render_template('department_login.html',
+                                       department=dept_upper,
+                                       dept_info=dept_meta[dept_upper],
+                                       error=f"Access Denied: Your account ({u_dept or u_role}) is not authorized for the {dept_upper} Department. Please log in with {dept_upper} Authority credentials.")
+
+        return render_template('department_login.html',
+                               department=dept_upper,
+                               dept_info=dept_meta[dept_upper],
+                               error='Invalid credentials. Please check your email and password.')
+
+    return render_template('department_login.html',
+                           department=dept_upper,
+                           dept_info=dept_meta[dept_upper],
+                           error=error)
+
+
+@app.route('/admin/department/<dept_name>')
+def admin_department_portal(dept_name):
+    sync_automatic_statuses(get_db())
+    """Dedicated portal for each of the 3 Authority Departments: ELECTRICITY, PWD, WATER"""
+    dept_upper = dept_name.upper().strip()
+    if dept_upper not in ['ELECTRICITY', 'PWD', 'WATER']:
+        return redirect(url_for('admin_dashboard'))
+
+    # Strict Department Access Authorization:
+    # User must be logged in as an authority or admin
+    if 'user_id' not in session or session.get('role') not in ['admin', 'authority']:
+        return redirect(url_for('admin_department_login', dept_name=dept_name.lower()))
+
+    # Department Isolation: Electricity authority cannot access Water or PWD, etc.
+    user_dept = (session.get('department') or '').upper()
+    user_role = session.get('role')
+    if user_role != 'admin' and user_dept != dept_upper:
+        return redirect(url_for('admin_department_login', dept_name=dept_name.lower(),
+                                error=f"Access Denied: You are logged in as {user_dept} authority. Unauthorized access to {dept_upper} portal."))
+
+    all_complaints = get_db().execute(
+        '''
+        SELECT c.*, u.name AS submitted_by, u.phone
+        FROM complaints c
+        JOIN users u ON c.user_id = u.id
+        ORDER BY c.created_at DESC
+        '''
+    ).fetchall()
+
+    dept_complaints = []
+    for c in all_complaints:
+        c_dict = dict(c)
+        c_dept = c_dict.get('department') or get_department_for_category(c_dict.get('category'))
+        c_dict['department'] = c_dept
+        p = c_dict.get('priority') or 0
+        if p >= 7:
+            c_dict['priority_level'] = 'HIGH'
+        elif p >= 4:
+            c_dict['priority_level'] = 'MEDIUM'
+        else:
+            c_dict['priority_level'] = 'LOW'
+
+        if c_dept == dept_upper:
+            dept_complaints.append(c_dict)
+
+    stats = {
+        'total': len(dept_complaints),
+        'pending': len([c for c in dept_complaints if c['status'] == 'Pending']),
+        'in_progress': len([c for c in dept_complaints if c['status'] == 'In Progress']),
+        'resolved': len([c for c in dept_complaints if c['status'] == 'Resolved']),
+        'high_priority': len([c for c in dept_complaints if c['priority_level'] == 'HIGH']),
+        'medium_priority': len([c for c in dept_complaints if c['priority_level'] == 'MEDIUM']),
+        'low_priority': len([c for c in dept_complaints if c['priority_level'] == 'LOW']),
+    }
+
+    dept_meta = {
+        'ELECTRICITY': {
+            'title': 'Electricity Department Portal',
+            'kannada_title': 'ವಿದ್ಯುತ್ ಇಲಾಖೆ ಪೋರ್ಟಲ್',
+            'icon': '⚡',
+            'color': '#f59e0b',
+            'desc': 'Power Supply & Streetlights Management',
+            'categories': ['Electricity / Power Supply', 'Streetlight']
+        },
+        'PWD': {
+            'title': 'Public Works Department (PWD) Portal',
+            'kannada_title': 'ಲೋಕೋಪಯೋಗಿ ಇಲಾಖೆ (PWD) ಪೋರ್ಟಲ್',
+            'icon': '🏗',
+            'color': '#3b82f6',
+            'desc': 'Roads, Bridges, Drainage & Public Infrastructure Management',
+            'categories': ['Road Damage', 'Drainage / Public Infrastructure', 'Other PWD / Public Infrastructure']
+        },
+        'WATER': {
+            'title': 'Water & Sanitation Authority Portal',
+            'kannada_title': 'ಜಲಮಂಡಳಿ ಮತ್ತು ನೈರ್ಮಲ್ಯ ಇಲಾಖೆ ಪೋರ್ಟಲ್',
+            'icon': '💧',
+            'color': '#06b6d4',
+            'desc': 'Drinking Water Supply, Pipelines & Contamination Management',
+            'categories': ['Water Supply', 'Water Leakage / Pipeline', 'Water Quality / Contamination']
+        }
+    }
+
     return render_template(
-        'admin_dashboard.html',
+        'department_portal.html',
+        department=dept_upper,
+        dept_info=dept_meta.get(dept_upper, {}),
         stats=stats,
-        complaints=complaint_list,
-        categories=categories
+        complaints=dept_complaints
     )
 
 
 @app.route('/admin/complaint/<int:complaint_id>/status', methods=['POST'])
-@admin_required
+@login_required
 def update_complaint_status(complaint_id):
-    """Admin endpoint to update complaint status (Pending, In Progress, Resolved)"""
-    new_status = request.form.get('status')
-    if not new_status and request.is_json:
-        data = request.get_json() or {}
-        new_status = data.get('status')
-        
-    valid_statuses = {'Pending', 'In Progress', 'Resolved'}
-    if not new_status or new_status not in valid_statuses:
+    """Update resolution status of a complaint by administrative authority or master admin."""
+    if session.get('role') not in ['admin', 'authority']:
         if request.is_json:
-            return jsonify({'success': False, 'error': 'Invalid status'}), 400
-        return redirect(url_for('admin_dashboard'))
-        
-    db = get_db()
-    db.execute('UPDATE complaints SET status = ? WHERE id = ?', (new_status, complaint_id))
-    db.commit()
-    
+            return jsonify({'error': 'Unauthorized authority access', 'success': False}), 403
+        return redirect(url_for('login'))
+
+    new_status = request.form.get('status') or (request.get_json() or {}).get('status')
+    allowed = ['Pending', 'In Progress', 'Resolved', 'Rejected/Cancelled']
+    if new_status not in allowed:
+        if request.is_json:
+            return jsonify({'error': 'Invalid status', 'success': False}), 400
+        return redirect(request.referrer or url_for('admin_dashboard'))
+
+    get_db().execute('UPDATE complaints SET status = ?, manual_status = 1 WHERE id = ?', (new_status, complaint_id))
+    get_db().commit()
+
     if request.is_json:
-        return jsonify({'success': True, 'complaint_id': complaint_id, 'status': new_status})
-        
-    return redirect(url_for('admin_dashboard'))
+        return jsonify({'success': True, 'complaint_id': complaint_id, 'new_status': new_status})
+    return redirect(request.referrer or url_for('admin_dashboard'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -426,22 +731,16 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
 
         user = get_db().execute(
-            'SELECT * FROM users WHERE email = ? AND password = ?',
-            (email, password)
             'SELECT * FROM users WHERE email = ?',
             (email,)
         ).fetchone()
 
-        if user:
         if user and verify_user_password(user['password'], password):
             session['user_id'] = user['id']
             session['user_name'] = user['name']
             session['role'] = user['role'] or 'citizen'
-            session.permanent = True
             if session['role'] == 'admin':
                 return redirect(url_for('admin_dashboard'))
             return redirect(url_for('dashboard'))
@@ -463,9 +762,10 @@ def register():
             return render_template('register.html', error='All required fields must be filled')
 
         try:
+            hashed_pwd = generate_password_hash(password)
             get_db().execute(
-                'INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)',
-                (name, email, phone, password)
+                'INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)',
+                (name, email, phone, hashed_pwd, 'citizen')
             )
             get_db().commit()
             return redirect(url_for('login'))
@@ -484,11 +784,9 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    sync_automatic_statuses(get_db())
     user_id = session.get('user_id')
     role = session.get('role', 'citizen')
-    
-    # Get citizen profile details
-    user = get_db().execute('SELECT id, name, email, phone, role FROM users WHERE id = ?', (user_id,)).fetchone()
     
     # Ensure citizen only sees their own complaints
     if role == 'citizen':
@@ -509,15 +807,22 @@ def dashboard():
             '''
         ).fetchall()
 
-    return render_template('dashboard.html', complaints=[dict(c) for c in complaints])
+    complaint_list = []
+    for c in complaints:
+        c_dict = dict(c)
+        c_dict['department'] = c_dict.get('department') or get_department_for_category(c_dict.get('category'))
+        p = c_dict.get('priority') or 0
+        if p >= 7:
+            c_dict['priority_level'] = 'HIGH'
+        elif p >= 4:
+            c_dict['priority_level'] = 'MEDIUM'
+        else:
+            c_dict['priority_level'] = 'LOW'
+        complaint_list.append(c_dict)
+
     recent_submission = session.pop('recent_submission', None)
 
-    return render_template(
-        'dashboard.html',
-        complaints=[dict(c) for c in complaints],
-        user=dict(user) if user else None,
-        recent_submission=recent_submission
-    )
+    return render_template('dashboard.html', complaints=complaint_list, recent_submission=recent_submission)
 
 
 @app.route('/new-complaint', methods=['GET', 'POST'])
@@ -567,46 +872,108 @@ def new_complaint():
         if not title or not location or not description:
             return render_template('new_complaint.html', error='Please fill all required complaint fields')
 
-        # AI Classification
+        # AI Classification & Civic Scope Validation
         classification_result = classifier.classify_complaint(title, description, location)
+        
+        is_ajax = (
+            request.is_json or 
+            request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 
+            'application/json' in request.headers.get('Accept', '')
+        )
+
+        # CRUCIAL RULE: UNSUPPORTED COMPLAINTS MUST NOT BE SUBMITTED OR STORED IN DB
+        if not classification_result.get('is_supported', True):
+            if is_ajax:
+                return jsonify({
+                    'success': False,
+                    'is_supported': False,
+                    'message': classification_result.get('message', REJECTION_MESSAGE)
+                }), 400
+            return render_template(
+                'new_complaint.html',
+                unsupported_error=classification_result.get('message', REJECTION_MESSAGE),
+                prev_title=title,
+                prev_desc=description,
+                prev_loc=location
+            ), 400
+
         ai_category = classification_result['category']
+        department = classification_result['department']
         priority = int(classification_result['priority'])
 
         # Insert complaint into database
-        # Insert complaint into database (AI category is used automatically)
-        final_category = category if (category and category.strip()) else ai_category
         get_db().execute(
             '''
             INSERT INTO complaints 
-            (user_id, title, category, location, description, status, latitude, longitude,
-             is_voice_complaint, voice_note_path, image_path, language, ai_category, priority)
-            VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?, ?, ?, ?)
+            (user_id, title, category, department, location, description, status, latitude, longitude,
+             is_voice_complaint, voice_note_path, image_path, language, ai_category, priority, manual_status)
+            VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?, ?, ?, ?, 0)
             ''',
-            (session['user_id'], title, category or ai_category, location, description,
-            (session['user_id'], title, final_category, location, description,
+            (session['user_id'], title, category or ai_category, department, location, description,
              latitude, longitude, is_voice, voice_note_path, image_path, language, ai_category, priority)
         )
 
         complaint_id = get_db().execute('SELECT last_insert_rowid()').fetchone()[0]
 
         # Log priority classification
-        get_db().execute(
-            '''
-            INSERT INTO complaint_priority_log (complaint_id, priority_score, classification_confidence)
-            VALUES (?, ?, ?)
-            ''',
-            (complaint_id, classification_result['priority'], classification_result['confidence'])
-        )
+        try:
+            get_db().execute(
+                '''
+                INSERT INTO complaint_priority_log (complaint_id, priority_score, classification_confidence)
+                VALUES (?, ?, ?)
+                ''',
+                (complaint_id, classification_result['priority'], classification_result['confidence'])
+            )
+        except Exception:
+            pass
 
         get_db().commit()
-        
+
+        # Set flash banner confirmation for dashboard
         session['recent_submission'] = {
             'id': complaint_id,
-            'title': title,
             'category': ai_category,
+            'department': department,
+            'priority_level': classification_result.get('priority_level', 'MEDIUM'),
             'priority': priority
         }
+
+        # Build Demo SMS Details for Acknowledgement
+        user_row = get_db().execute("SELECT phone, name FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+        user_phone = (user_row['phone'] if user_row and user_row['phone'] else '') or '+91 98765 43210'
         
+        dept_title = department
+        if department == 'ELECTRICITY':
+            dept_title = 'Electricity Department'
+        elif department == 'PWD':
+            dept_title = 'PWD Infrastructure Department'
+        elif department == 'WATER':
+            dept_title = 'Water & Sanitation Department'
+
+        created_time_str = datetime.now().strftime('%d %b %Y, %I:%M %p')
+        demo_sms_text = f"Govt of Karnataka - GrievanceConnect: Your complaint #{complaint_id} for '{ai_category}' has been registered and forwarded to {dept_title}. Initial Status: Pending."
+
+        if is_ajax:
+            return jsonify({
+                'success': True,
+                'is_supported': True,
+                'complaint_id': complaint_id,
+                'category': ai_category,
+                'department': department,
+                'dept_title': dept_title,
+                'priority_level': classification_result.get('priority_level', 'MEDIUM'),
+                'priority': priority,
+                'location': location,
+                'status': 'Pending',
+                'created_at': created_time_str,
+                'message': f"Your complaint has been successfully received, categorized under {ai_category}, and routed to the {dept_title} for immediate action.",
+                'demo_sms': {
+                    'to': user_phone,
+                    'text': demo_sms_text,
+                    'status': 'Simulated Demo SMS Delivery (Zero Cost)'
+                }
+            })
+
         return redirect(url_for('dashboard'))
 
     return render_template('new_complaint.html')
@@ -619,13 +986,11 @@ def voice_complaint():
         return redirect(url_for('login'))
     
     if request.method == 'POST':
-        # Same logic as new_complaint but assumes voice input
         title = request.form.get('title', '')[:100]
         description = request.form.get('description')
         location = request.form.get('location')
         latitude = request.form.get('latitude')
         longitude = request.form.get('longitude')
-        category = request.form.get('category')
         
         # If coordinates provided but no location name, try reverse geocoding
         try:
@@ -639,45 +1004,54 @@ def voice_complaint():
         if not location or not description:
             return render_template('voice_complaint.html', error='Location and description are required')
         
-        # AI Classification
+        # AI Classification & Validation
         classification_result = classifier.classify_complaint(title or description[:50], description, location)
+        
+        if not classification_result.get('is_supported', True):
+            return render_template(
+                'voice_complaint.html',
+                unsupported_error=classification_result.get('message', REJECTION_MESSAGE)
+            ), 400
+
         ai_category = classification_result['category']
+        department = classification_result['department']
         priority = int(classification_result['priority'])
-        final_category = category if (category and category.strip()) else ai_category
         
         # Insert complaint
         get_db().execute(
             '''
             INSERT INTO complaints 
-            (user_id, title, category, location, description, status, latitude, longitude, 
+            (user_id, title, category, department, location, description, status, latitude, longitude, 
              is_voice_complaint, ai_category, priority)
-            VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, 1, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?, ?, 1, ?, ?)
             ''',
-            (session['user_id'], title or description[:100], ai_category, location, description,
-            (session['user_id'], title or description[:100], final_category, location, description,
+            (session['user_id'], title or description[:100], ai_category, department, location, description,
              latitude, longitude, ai_category, priority)
         )
         
         complaint_id = get_db().execute('SELECT last_insert_rowid()').fetchone()[0]
         
-        # Log priority
-        get_db().execute(
-            '''
-            INSERT INTO complaint_priority_log (complaint_id, priority_score, classification_confidence)
-            VALUES (?, ?, ?)
-            ''',
-            (complaint_id, classification_result['priority'], classification_result['confidence'])
-        )
+        try:
+            get_db().execute(
+                '''
+                INSERT INTO complaint_priority_log (complaint_id, priority_score, classification_confidence)
+                VALUES (?, ?, ?)
+                ''',
+                (complaint_id, classification_result['priority'], classification_result['confidence'])
+            )
+        except Exception:
+            pass
         
         get_db().commit()
-        
+
         session['recent_submission'] = {
             'id': complaint_id,
-            'title': title or description[:50],
             'category': ai_category,
+            'department': department,
+            'priority_level': classification_result.get('priority_level', 'MEDIUM'),
             'priority': priority
         }
-        
+
         return redirect(url_for('dashboard'))
     
     return render_template('voice_complaint.html')
@@ -685,6 +1059,7 @@ def voice_complaint():
 
 @app.route('/complaints')
 def complaints():
+    sync_automatic_statuses(get_db())
     complaint_list = get_db().execute(
         '''
         SELECT c.*, u.name AS submitted_by
@@ -693,36 +1068,21 @@ def complaints():
         ORDER BY c.created_at DESC
         '''
     ).fetchall()
-    user_id = session.get('user_id')
-    role = session.get('role', 'citizen')
-    
-    # If logged in as citizen, show citizen's own complaints; if admin or public, show all
-    if user_id and role == 'citizen':
-        complaint_list = get_db().execute(
-            '''
-            SELECT c.*, u.name AS submitted_by, u.phone
-            FROM complaints c
-            JOIN users u ON c.user_id = u.id
-            WHERE c.user_id = ?
-            ORDER BY c.created_at DESC
-            ''',
-            (user_id,)
-        ).fetchall()
-    else:
-        complaint_list = get_db().execute(
-            '''
-            SELECT c.*, u.name AS submitted_by, u.phone
-            FROM complaints c
-            JOIN users u ON c.user_id = u.id
-            ORDER BY c.created_at DESC
-            '''
-        ).fetchall()
-        
-    return render_template('complaints.html', complaints=[dict(item) for item in complaint_list])
+
+    formatted_complaints = []
+    for item in complaint_list:
+        c_dict = dict(item)
+        c_dict['department'] = c_dict.get('department') or get_department_for_category(c_dict.get('category'))
+        p = c_dict.get('priority') or 0
+        c_dict['priority_level'] = 'HIGH' if p >= 7 else ('MEDIUM' if p >= 4 else 'LOW')
+        formatted_complaints.append(c_dict)
+
+    return render_template('complaints.html', complaints=formatted_complaints)
 
 
 @app.route('/complaint/<int:complaint_id>')
 def complaint_details(complaint_id):
+    sync_automatic_statuses(get_db())
     complaint = get_db().execute(
         '''
         SELECT c.*, u.name AS submitted_by
@@ -738,14 +1098,18 @@ def complaint_details(complaint_id):
 
     complaint_data = dict(complaint)
     complaint_data['date'] = datetime.strptime(complaint_data['created_at'], '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
+    complaint_data['department'] = complaint_data.get('department') or get_department_for_category(complaint_data.get('category'))
     
-    # Add priority label
-    priority_mapping = {
-        0: 'Low', 1: 'Low', 2: 'Low', 3: 'Low',
-        4: 'Medium', 5: 'Medium', 6: 'Medium',
-        7: 'High', 8: 'High', 9: 'Critical', 10: 'Critical'
-    }
-    complaint_data['priority_label'] = priority_mapping.get(complaint_data['priority'], 'Unknown')
+    p = complaint_data.get('priority') or 0
+    if p >= 7:
+        complaint_data['priority_level'] = 'HIGH'
+        complaint_data['priority_label'] = 'High'
+    elif p >= 4:
+        complaint_data['priority_level'] = 'MEDIUM'
+        complaint_data['priority_label'] = 'Medium'
+    else:
+        complaint_data['priority_level'] = 'LOW'
+        complaint_data['priority_label'] = 'Low'
     
     return render_template('complaint_details.html', complaint=complaint_data)
 
@@ -761,23 +1125,27 @@ def admin_home():
 
 @app.route('/api/classify-complaint', methods=['POST'])
 def api_classify_complaint():
-    """API endpoint for AI-based complaint classification"""
+    """API endpoint for AI-based complaint classification, department mapping and scope validation."""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         title = data.get('title', '')
-        description = data.get('description', '')
+        description = data.get('description') or data.get('text', '')
         location = data.get('location', '')
         
-        if not title or not description:
-            return jsonify({'error': 'Title and description are required'}), 400
+        if not title and not description:
+            return jsonify({'error': 'Title or description is required', 'success': False}), 400
         
         result = classifier.classify_complaint(title, description, location)
         
         return jsonify({
             'success': True,
+            'is_supported': result.get('is_supported', True),
             'category': result['category'],
+            'department': result.get('department'),
             'priority': result['priority'],
-            'confidence': result['confidence']
+            'priority_level': result.get('priority_level', 'MEDIUM'),
+            'confidence': result['confidence'],
+            'message': result.get('message')
         })
     except Exception as e:
         return jsonify({'error': str(e), 'success': False}), 500
@@ -917,7 +1285,7 @@ def api_complaint_analytics():
         db = get_db()
         rows = db.execute(
             '''
-            SELECT id, title, category, ai_category, status, priority, created_at
+            SELECT id, title, category, department, ai_category, status, priority, created_at
             FROM complaints
             WHERE user_id = ?
             ORDER BY created_at ASC
@@ -928,9 +1296,8 @@ def api_complaint_analytics():
         complaints = []
         for r in rows:
             rec = {k: r[k] for k in r.keys()}
-            # Normalize category to prefer ai_category when available
             rec['category'] = rec.get('ai_category') or rec.get('category') or 'Uncategorized'
-            # Ensure priority is integer
+            rec['department'] = rec.get('department') or get_department_for_category(rec['category'])
             try:
                 rec['priority'] = int(rec.get('priority') or 0)
             except Exception:
@@ -944,7 +1311,7 @@ def api_complaint_analytics():
 
 @app.route('/api/process-voice-complaint', methods=['POST'])
 def api_process_voice_complaint():
-    """API endpoint to process a complete voice-based complaint"""
+    """API endpoint to process a complete voice-based complaint with scope validation."""
     try:
         if 'user_id' not in session:
             return jsonify({'error': 'User not authenticated', 'success': False}), 401
@@ -1003,51 +1370,70 @@ def api_process_voice_complaint():
         if not location or not location.strip():
             return jsonify({'error': 'Location is required', 'success': False}), 400
 
-        # AI Classification
+        # AI Classification & Validation
         classification = classifier.classify_complaint(
             (title or transcribed_text[:50]),
             transcribed_text,
             location
         )
 
+        if not classification.get('is_supported', True):
+            return jsonify({
+                'success': False,
+                'is_supported': False,
+                'error': classification.get('message', REJECTION_MESSAGE)
+            }), 400
+
+        ai_category = classification['category']
+        department = classification['department']
+        priority = int(classification['priority'])
+
         # Insert complaint
         get_db().execute(
             '''
             INSERT INTO complaints 
-            (user_id, title, category, location, description, status, latitude, longitude,
+            (user_id, title, category, department, location, description, status, latitude, longitude,
              is_voice_complaint, voice_note_path, ai_category, priority)
-            VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, 1, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?, ?, 1, ?, ?, ?)
             ''',
-            (session['user_id'], (title or transcribed_text[:100]), category or classification['category'],
-             location, transcribed_text, latitude, longitude,
+            (session['user_id'], (title or transcribed_text[:100]), category or ai_category,
+             department, location, transcribed_text, latitude, longitude,
              save_result['relative_path'] if save_result and save_result.get('relative_path') else None,
-             classification['category'], int(classification['priority']))
+             ai_category, priority)
         )
 
         complaint_id = get_db().execute('SELECT last_insert_rowid()').fetchone()[0]
 
         # Log priority
-        get_db().execute(
-            '''
-            INSERT INTO complaint_priority_log (complaint_id, priority_score, classification_confidence)
-            VALUES (?, ?, ?)
-            ''',
-            (complaint_id, classification['priority'], classification['confidence'])
-        )
+        try:
+            get_db().execute(
+                '''
+                INSERT INTO complaint_priority_log (complaint_id, priority_score, classification_confidence)
+                VALUES (?, ?, ?)
+                ''',
+                (complaint_id, classification['priority'], classification['confidence'])
+            )
+        except Exception:
+            pass
 
         get_db().commit()
 
         session['recent_submission'] = {
             'id': complaint_id,
-            'title': (title or transcribed_text[:50]),
-            'category': classification['category'],
-            'priority': int(classification['priority'])
+            'category': ai_category,
+            'department': department,
+            'priority_level': classification.get('priority_level', 'MEDIUM'),
+            'priority': priority
         }
 
         return jsonify({
             'success': True,
+            'is_supported': True,
             'complaint_id': complaint_id,
             'transcribed_text': transcribed_text,
+            'category': ai_category,
+            'department': department,
+            'priority_level': classification.get('priority_level', 'MEDIUM'),
             'classification': classification,
             'message': 'Voice complaint processed successfully'
         })

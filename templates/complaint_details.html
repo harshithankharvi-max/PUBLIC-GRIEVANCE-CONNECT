@@ -360,6 +360,17 @@
                     </div>
 
 
+                    <!-- Department Badge -->
+                    <div class="meta-item">
+                        {% if complaint.department == 'ELECTRICITY' %}
+                        <span class="civic-dept-badge badge-elec" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;">⚡ ELECTRICITY</span>
+                        {% elif complaint.department == 'WATER' %}
+                        <span class="civic-dept-badge badge-water" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;">💧 WATER</span>
+                        {% else %}
+                        <span class="civic-dept-badge badge-pwd" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;">🏗️ PWD</span>
+                        {% endif %}
+                    </div>
+
                     <!-- Voice Complaint -->
                     {% if complaint.is_voice_complaint == 1 %}
 
@@ -381,6 +392,7 @@
                 </div>
 
             </div>
+
 
 
             <!-- Complaint Body -->
@@ -438,6 +450,24 @@
                                     Text Based
                                 {% endif %}
 
+                            </div>
+
+                        </div>
+
+                        <div class="ai-item">
+
+                            <div class="ai-item-label">
+                                Assigned Authority
+                            </div>
+
+                            <div class="ai-item-value">
+                                {% if complaint.department == 'ELECTRICITY' %}
+                                ⚡ Electricity Dept
+                                {% elif complaint.department == 'WATER' %}
+                                💧 Water & Sanitation
+                                {% else %}
+                                🏗️ PWD Infrastructure
+                                {% endif %}
                             </div>
 
                         </div>
@@ -574,6 +604,44 @@
 
                     </div>
 
+                    <!-- Department -->
+                    <div class="info-card">
+
+                        <strong>
+                            Department
+                        </strong>
+
+                        <span style="font-weight: 700; color: #1e293b;">
+                            {% if complaint.department == 'ELECTRICITY' %}
+                            ⚡ ELECTRICITY
+                            {% elif complaint.department == 'WATER' %}
+                            💧 WATER
+                            {% else %}
+                            🏗️ PWD
+                            {% endif %}
+                        </span>
+
+                    </div>
+
+                    <!-- Priority Level -->
+                    <div class="info-card">
+
+                        <strong>
+                            Priority Hazard
+                        </strong>
+
+                        <span>
+                            {% if complaint.priority_level == 'HIGH' or complaint.priority >= 7 %}
+                            <span class="civic-prio-badge badge-high" style="padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">🔴 HIGH HAZARD</span>
+                            {% elif complaint.priority_level == 'LOW' or complaint.priority < 4 %}
+                            <span class="civic-prio-badge badge-low" style="padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">🟢 LOW</span>
+                            {% else %}
+                            <span class="civic-prio-badge badge-medium" style="padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">🟡 MEDIUM</span>
+                            {% endif %}
+                        </span>
+
+                    </div>
+
                 </div>
 
 
@@ -633,25 +701,38 @@
 
 
                 <!-- Action Buttons -->
-                <div class="action-buttons" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                    {% if session.get('role') == 'admin' %}
+                <div class="action-buttons" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        {% if session.get('role') == 'admin' %}
                         <a href="{{ url_for('admin_dashboard') }}" class="btn-back">
-                            ← Back to Admin Dashboard
+                            ← Back to Admin Command Center
                         </a>
-                        <form method="POST" action="{{ url_for('update_complaint_status', complaint_id=complaint.id) }}" style="display:inline-flex; align-items:center; gap:8px;">
-                            <label style="font-weight:600; font-size:13px;">Update Status:</label>
-                            <select name="status" class="status-select-civic" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; font-weight:600;">
-                                <option value="Pending" {% if complaint.status == 'Pending' %}selected{% endif %}>Pending</option>
-                                <option value="In Progress" {% if complaint.status == 'In Progress' %}selected{% endif %}>In Progress</option>
-                                <option value="Resolved" {% if complaint.status == 'Resolved' %}selected{% endif %}>Resolved</option>
-                            </select>
-                            <button type="submit" class="btn btn-primary" style="padding:8px 16px; border-radius:6px;">Save Status</button>
-                        </form>
-                    {% else %}
+                        <a href="{{ url_for('admin_department_portal', dept_name=complaint.department|lower) }}" class="btn-back" style="background: #e2e8f0;">
+                            🏢 Open {{ complaint.department }} Portal
+                        </a>
+                        {% else %}
                         <a href="{{ url_for('dashboard') }}" class="btn-back">
                             ← Back to Dashboard
                         </a>
+                        {% endif %}
+                    </div>
+
+                    {% if session.get('role') in ['admin', 'authority'] %}
+                    <div class="admin-status-tool" style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 13px; font-weight: 700; color: #475569;">Update Status:</span>
+                        <form method="POST" action="{{ url_for('update_complaint_status', complaint_id=complaint.id) }}" style="display: inline-flex; gap: 8px;">
+                            <select name="status" class="status-select-civic" style="font-size: 13px; padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff;">
+                                <option value="Pending" {% if complaint.status == 'Pending' %}selected{% endif %}>⏳ Pending</option>
+                                <option value="In Progress" {% if complaint.status == 'In Progress' %}selected{% endif %}>⚙️ In Progress</option>
+                                <option value="Resolved" {% if complaint.status == 'Resolved' %}selected{% endif %}>✓ Resolved</option>
+                                <option value="Rejected/Cancelled" {% if complaint.status == 'Rejected/Cancelled' %}selected{% endif %}>❌ Rejected/Cancelled</option>
+                            </select>
+                            <button type="submit" style="background: #2563eb; color: white; border: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Update</button>
+                        </form>
+                    </div>
                     {% endif %}
+
                 </div>
 
             </div>
@@ -660,18 +741,35 @@
 
     </div>
 
+
     <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+
     <!-- Map JavaScript -->
     <script>
+
         document.addEventListener("DOMContentLoaded", function () {
+
+            /*
+             * Get the map container.
+             *
+             * If the complaint does not have latitude/longitude,
+             * this element will not exist.
+             */
             const mapContainer = document.getElementById("map-container");
+
             if (!mapContainer) {
                 return;
             }
 
+
+            /*
+             * Get coordinates from HTML data attributes.
+             */
             const locationName = mapContainer.dataset.location || "Complaint Location";
+
+            // Try to get coordinates from data attributes
             let latitude = mapContainer.dataset.latitude ? parseFloat(mapContainer.dataset.latitude) : null;
             let longitude = mapContainer.dataset.longitude ? parseFloat(mapContainer.dataset.longitude) : null;
 
@@ -694,12 +792,13 @@
             (async function () {
                 try {
                     if (latitude != null && longitude != null && !Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+                        // Use provided coordinates
                         initMap(latitude, longitude, locationName);
                         document.getElementById('map-container').classList.add('active');
                         return;
                     }
 
-                    // Fallback: geocode location name using Nominatim
+                    // Fallback: geocode the location name using Nominatim
                     const q = encodeURIComponent(locationName);
                     const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`;
                     const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
@@ -714,13 +813,51 @@
                         return;
                     }
 
+                    // No coords found — hide map
                     mapContainer.style.display = 'none';
                 } catch (err) {
                     console.error('Map init error:', err);
                     mapContainer.style.display = 'none';
                 }
             })();
+
+
+            /*
+             * Add OpenStreetMap tiles.
+             */
+            L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+                    attribution:
+                        "&copy; OpenStreetMap contributors",
+
+                    maxZoom: 19
+                }
+            ).addTo(map);
+
+
+            /*
+             * Add complaint location marker.
+             */
+            L.marker([
+                latitude,
+                longitude
+            ])
+            .addTo(map)
+            .bindPopup(locationName)
+            .openPopup();
+
+
+            /*
+             * Fix Leaflet map rendering if the container
+             * becomes visible after page load.
+             */
+            setTimeout(function () {
+                map.invalidateSize();
+            }, 200);
+
         });
+
     </script>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
